@@ -1,0 +1,210 @@
+@import "tailwindcss";
+
+/* ============================================================
+   SPACE ESSE — "Atelier" design system
+   Light architectural editorial. Warm paper, ink, architect's
+   blue, a single burnt-sienna signal accent. Schibsted Grotesk
+   type, JetBrains Mono figures, tabular numerics, refined restraint.
+   ============================================================ */
+
+@theme {
+  /* Type */
+  --font-display: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-bangla: "Hind Siliguri", "Schibsted Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  /* Surfaces */
+  --color-bone: #f3eee3;
+  --color-bone-2: #efe9dc;
+  --color-paper: #fdfbf5;
+  --color-paper-2: #f9f6ec;
+
+  /* Ink */
+  --color-ink: #1a1712;
+  --color-ink-soft: #5b5446;
+  --color-ink-faint: #8c8472;
+  --color-ink-ghost: #b3ab97;
+
+  /* Lines */
+  --color-line: #e3dccb;
+  --color-line-soft: #ece6d8;
+  --color-line-strong: #d3cab5;
+
+  /* Architect's blue (primary) */
+  --color-blue: #1c3d5a;
+  --color-blue-bright: #2b5d86;
+  --color-blue-tint: #e7eef3;
+  --color-blue-ghost: #f1f5f8;
+
+  /* Burnt sienna (signal accent) */
+  --color-sienna: #b1532a;
+  --color-sienna-bright: #c9663b;
+  --color-sienna-tint: #f4e5dc;
+
+  /* Status */
+  --color-sage: #4a7a5b;
+  --color-sage-tint: #e4ede4;
+  --color-ochre: #9a6b17;
+  --color-ochre-tint: #f3ead2;
+  --color-rust: #a33523;
+  --color-rust-tint: #f3ddd6;
+
+  /* Chart palette (architectural, muted) */
+  --color-chart-1: #1c3d5a;
+  --color-chart-2: #b1532a;
+  --color-chart-3: #4a7a5b;
+  --color-chart-4: #9a6b17;
+  --color-chart-5: #6a7b8c;
+  --color-chart-6: #8c8472;
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Shadows (warm, subtle) */
+  --shadow-card: 0 1px 2px rgba(26, 23, 18, 0.05), 0 1px 1px rgba(26, 23, 18, 0.03);
+  --shadow-pop: 0 12px 32px -8px rgba(26, 23, 18, 0.18), 0 2px 6px rgba(26, 23, 18, 0.08);
+  --shadow-lift: 0 6px 20px -6px rgba(26, 23, 18, 0.14);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--color-bone);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv01";
+    margin: 0;
+  }
+
+  :lang(bn),
+  .bn {
+    font-family: var(--font-bangla);
+  }
+
+  ::selection {
+    background: var(--color-blue);
+    color: #fff;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  /* Custom scrollbars — thin, architectural */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-line-strong);
+    border-radius: 6px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ink-ghost);
+    background-clip: content-box;
+    border: 3px solid transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-blue);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+@layer utilities {
+  /* Tabular figures for all metrics */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  .font-display {
+    font-family: var(--font-display);
+  }
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  /* Drafting label: small uppercase mono, tracked out */
+  .label-draft {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-ink-faint);
+  }
+
+  /* Architectural hairline grid background */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgba(26, 23, 18, 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(26, 23, 18, 0.035) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .bg-grid-lg {
+    background-image:
+      linear-gradient(to right, rgba(26, 23, 18, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(26, 23, 18, 0.04) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+
+  /* Drafting corner ticks — apply to a relative container */
+  .drafting-corners::before,
+  .drafting-corners::after {
+    content: "";
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-color: var(--color-line-strong);
+    pointer-events: none;
+  }
+  .drafting-corners::before {
+    top: -1px;
+    left: -1px;
+    border-top: 1.5px solid;
+    border-left: 1.5px solid;
+  }
+  .drafting-corners::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom: 1.5px solid;
+    border-right: 1.5px solid;
+  }
+
+  .animate-rise {
+    animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
