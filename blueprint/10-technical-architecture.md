@@ -33,6 +33,25 @@ Three architectural commitments collapse most of the 18-layer decision space bef
 | **Custom React (Next.js + TypeScript)** | **RECOMMENDED.** The product *is* a bespoke bilingual dashboard + manual-capture forms + AI report views with inline provenance chips and "insufficient data" states — none of that is an off-the-shelf BI screen. React + Next.js gives SSR for fast first paint on Dhaka networks, mature i18n (`next-intl`), a huge component ecosystem, and the same codebase can wrap to mobile via PWA/Capacitor for site-report capture. |
 | Power BI / Metabase / Superset as the UI | Rejected as the *primary* UI — see build-vs-buy below. Embedded BI can sit *inside* the React shell for power-user ad-hoc exploration, but it cannot be the manual-capture + AI-narration product. |
 
+### Prototype vs. production frontend — Vite now, Next.js for the build
+
+> **Decision (recorded):** the client-facing **pilot prototype** (the SPACE ESSE demo in `app/`) is built on **Vite + React + TypeScript**, deployed as a static SPA. The **production** frontend should adopt **Next.js** (as recommended above) once a real backend lands. Both are React on the same component library and design system, so this is a swap, not a rewrite.
+
+**Why the prototype is Vite, not Next.js**
+- It is **frontend-only with mock data** — no server, no API routes, no SSR data fetching — so Next.js's defining strengths (server components, SSR/SSG, API routes, middleware, server-side auth) would sit unused.
+- It is **dashboard-heavy and fully client-rendered** (Recharts, command palette, filters, AI assistant panel). SSR would add hydration boundaries and `"use client"` overhead for zero benefit, plus the usual chart/Radix SSR friction.
+- It ships as a **pure static `dist/`** — trivially hostable (Vercel/Netlify/S3+CDN), cheap, no Node runtime — ideal for a shareable first-impression demo.
+- **Lower risk / faster:** React 18 + Vite + Recharts + Radix "just work" with minimal config and instant HMR.
+
+**When to move to Next.js (the trigger):** when building the production SaaS that needs a real backend — server-side auth/sessions, API routes or server actions, RBAC enforced on the server, server components fetching the semantic-layer KPIs, server-side PDF/report generation, edge middleware, and any marketing/SEO surface. At that point Next.js (or Remix) is the right call and matches the recommendation above.
+
+**Why migration is low-friction**
+- The prototype is plain **React + React Router** — components, design system and pages port directly.
+- The data layer is already **abstracted behind `app/src/lib/api.ts`**: every read flows through one `resolve()` returning promises (consumed via TanStack Query). Swapping `resolve()` for `fetch`/server calls is the bulk of the work; the UI is untouched.
+- You mainly re-map routing (React Router → Next's router) and add the server/data layer. **Same host (Vercel) — no lock-in.**
+
+Read **Next.js** in the "MVP RECOMMENDED" rows below as the *production* target; the *pilot demo* intentionally runs on Vite for speed and a zero-backend static deploy.
+
 ### Analytics / dashboard visualization (build vs buy)
 
 | Option | Strengths | Weaknesses | Recommendation |
