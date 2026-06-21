@@ -1,24 +1,14 @@
 import {
-  Activity,
-  AlertTriangle,
+  Archive,
   Banknote,
   Building2,
-  Cable,
-  CalendarDays,
   ClipboardCheck,
-  Compass,
-  Crosshair,
-  FileStack,
+  FolderOpen,
   History,
-  Landmark,
   LayoutDashboard,
   Layers,
-  PencilLine,
-  Send,
+  Radar,
   Settings,
-  Sparkles,
-  Target,
-  TrendingUp,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -37,53 +27,22 @@ export interface NavGroup {
 
 export const NAV: NavGroup[] = [
   {
-    items: [{ label: "Dashboard", to: "/", icon: LayoutDashboard }],
-  },
-  {
-    heading: "Projects",
     items: [
-      { label: "Delivery & Ops", to: "/delivery", icon: Compass },
-      { label: "Portfolio", to: "/portfolio", icon: Layers },
-      { label: "Authority Approvals", to: "/approvals", icon: Landmark, badge: "alert" },
-      { label: "Document Control", to: "/deliverables", icon: FileStack },
-      { label: "Risks & Issues", to: "/risks", icon: AlertTriangle },
-      { label: "Calendar", to: "/calendar", icon: CalendarDays },
-    ],
-  },
-  {
-    heading: "Finance",
-    items: [
-      { label: "Financials", to: "/financials", icon: Banknote },
-      { label: "Profitability", to: "/profitability", icon: TrendingUp },
-    ],
-  },
-  {
-    heading: "Clients & Growth",
-    items: [
+      { label: "Dashboard", to: "/", icon: LayoutDashboard },
+      { label: "AI Radar", to: "/intelligence", icon: Radar, badge: "alert" },
+      { label: "Projects", to: "/projects", icon: Layers },
+      { label: "Approvals", to: "/approvals", icon: ClipboardCheck, badge: "alert" },
+      { label: "Files", to: "/files", icon: FolderOpen },
+      { label: "Finance", to: "/finance", icon: Banknote },
       { label: "Clients", to: "/clients", icon: Building2 },
-      { label: "Pipeline", to: "/pipeline", icon: Target },
-      { label: "Goals & Targets", to: "/goals", icon: Crosshair },
+      { label: "Archive", to: "/archive", icon: Archive },
     ],
   },
   {
-    heading: "People",
-    items: [{ label: "Resourcing", to: "/resourcing", icon: Users }],
-  },
-  {
-    heading: "Intelligence",
+    heading: "Studio",
     items: [
-      { label: "AI Reports", to: "/reports", icon: Sparkles },
-      { label: "Review Queue", to: "/review", icon: ClipboardCheck, badge: "alert" },
-      { label: "Scheduled Reports", to: "/schedules", icon: Send },
-    ],
-  },
-  {
-    heading: "Data & Setup",
-    items: [
-      { label: "Manual Capture", to: "/capture", icon: PencilLine },
-      { label: "Activity Log", to: "/activity", icon: History },
-      { label: "Data Sources", to: "/data-sources", icon: Cable },
-      { label: "Data Quality", to: "/data-quality", icon: Activity },
+      { label: "Team", to: "/team", icon: Users },
+      { label: "Activity", to: "/activity", icon: History },
       { label: "Settings", to: "/settings", icon: Settings },
     ],
   },

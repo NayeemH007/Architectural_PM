@@ -1,33 +1,38 @@
-# SPACE ESSE · Practice Intelligence
+# ArchIntel · Project control for design studios
 
-An **AI-powered reporting & analytics platform** for an architecture practice — a read-first intelligence layer that sits *above* the tools a firm already uses (accounting, files, email, calendar, manual capture) and turns scattered, mostly-uncaptured operational reality into trustworthy KPIs, dashboards, authority-approval tracking and **cited** AI insights.
+ArchIntel is the **central project-control system** for an architecture / interior-design studio. It keeps every project moving through its phases — files, drawings, approvals, client communication and payments in one workspace — **without replacing** the design tools the team already uses (AutoCAD, SketchUp, D5 Render, InDesign, Word, Excel).
 
-Built around **SPACE ESSE** (Dhaka, Bangladesh) as the pilot firm. It integrates with existing systems rather than replacing them, and every number is traceable to a source — the AI refuses to answer when the data isn't there.
+Built and tailored for **SPACE ESSE** (interior design studio, Dhaka) from a discovery meeting: their real 4-phase workflow, design & material approvals with the founder as final approver, WhatsApp client approvals, phase-based payments, a file register, a searchable archive, a firm-level finance hub, and an AI **Risk Radar** that flags risks before they happen.
 
 ## Repository layout
 
 | Folder | What it is |
 |---|---|
-| [`app/`](app/) | The **frontend prototype** — React + TypeScript + Vite + Tailwind. 24 routes, realistic mock data, swappable API layer. This is the live product demo. |
-| [`blueprint/`](blueprint/) | The **product & build blueprint** (~61k words): industry research, software ecosystem, data + integration architecture, KPI dictionary, AI reporting design, MVP scope, roadmap, pilot plan, security, costs. Start at [`blueprint/00-BLUEPRINT.md`](blueprint/00-BLUEPRINT.md). |
+| [`app/`](app/) | The **ArchIntel frontend** — React + TypeScript + Vite + Tailwind. The live product demo. |
+| [`docs/`](docs/) | System documentation (describes the earlier *Practice Intelligence* analytics concept — see note below). |
+| [`blueprint/`](blueprint/) | The original product & build blueprint. |
 
-## Run the app
+> **Note on direction:** the app pivoted from a building-architecture *analytics* concept (“Practice Intelligence”) to **ArchIntel**, a *project-control* system shaped by the Space Esse meeting. `docs/` and `blueprint/` document the earlier concept; the live `app/` is ArchIntel.
+
+## Run
 
 ```bash
 cd app
-pnpm install      # first time only
+pnpm install      # first time
 pnpm dev          # → http://localhost:5173
 ```
 
-`pnpm build` produces a static `dist/` you can host anywhere (Vercel / Netlify / S3+CDN — see [`app/README.md`](app/README.md)). Shortcuts: **⌘K / Ctrl+K** command palette, **⌘J / Ctrl+J** AI assistant.
+`pnpm build` → static `dist/` (host on Vercel/Netlify; SPA rewrite included in `app/vercel.json`). Shortcuts: **⌘K/Ctrl+K** command palette · **⌘J/Ctrl+J** AI Risk Radar.
 
-## Highlights
+## What's inside (frontend prototype, mock data)
 
-- **Section dashboards** — Executive, Delivery & Operations, Financials, Profitability, Resourcing, Clients, Portfolio analytics, Document Control.
-- **Bangladesh-real finance** — net cash modelled through 15% VAT, VDS and ~10% AIT/TDS withholding; BDT-native.
-- **Authority approvals** (RAJUK, FSCD, CAAB, DoE, utilities) as first-class, schedule-driving milestones.
-- **Trust by design** — every metric carries a confidence level, a "Why this number?" provenance trail and a data-completeness score; missing data is shown as *insufficient*, never fabricated.
-- **Manual capture** as a first-class connector (the highest-value data lives in WhatsApp/phone/paper).
-- **Intelligence** — cited AI reports & briefings, a review/sign-off queue, scheduled reports, an audit/activity log, and natural-language Q&A.
+- **Onboarding** — studio sign-up + a 4-step setup wizard.
+- **Dashboard** — management overview: blockers, pending approvals, overdue payments, team workload, and top AI risk flags.
+- **Project workspace** — one hub per project with the studio's **4 phases & checklists** (with gate rules), files, approvals, client comms, payments, decisions and activity.
+- **Approvals** — design & material approval inbox (founder = final approver) + client (WhatsApp) approval log.
+- **Files** — firm-wide register (owner · storage · version · date · status) that flags single-person/local-PC dependencies.
+- **Finance** — income vs expense, receivables (phase-based payment tracker), expenses, per-project profitability.
+- **AI Risk Radar** — proactive, pattern-based risk flags that learn the studio over time (preview; real learning is backend).
+- **Clients · Archive · Team · Activity · Settings**.
 
-> Prototype: all data is realistic **mock data**. The API layer (`app/src/lib/api.ts`) is built to swap onto a real backend without touching components.
+> Prototype: all data is realistic **mock data** behind a swappable API layer (`app/src/lib/archintel/`). No backend yet — when backend work starts it will live in a **separate repository** so it can't affect this live demo.

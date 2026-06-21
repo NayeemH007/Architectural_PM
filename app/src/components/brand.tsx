@@ -1,3 +1,15 @@
+/** ArchIntel product mark — a 2x2 project board grid (project control). */
+export function ArchIntelMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 100 100" className={className} fill="currentColor" aria-hidden="true">
+      <rect x="12" y="12" width="33" height="33" rx="6" />
+      <rect x="55" y="12" width="33" height="33" rx="6" opacity="0.6" />
+      <rect x="12" y="55" width="33" height="33" rx="6" opacity="0.6" />
+      <rect x="55" y="55" width="33" height="33" rx="6" />
+    </svg>
+  );
+}
+
 /** SPACE ESSE mark — two stacked frames with center breaks, reproduced
  *  as crisp vector so it scales and recolors (uses currentColor). */
 export function Mark({ className }: { className?: string }) {

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as RD from "@radix-ui/react-dialog";
-import { ArrowRight, CornerDownLeft, PencilLine, Search, Sparkles, type LucideIcon } from "lucide-react";
+import { CornerDownLeft, FolderOpen, Layers, Plus, Search, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { NAV } from "@/lib/nav";
-import { useProjects } from "@/lib/api";
+import { useAiClients, useAiFiles, useAiProjects } from "@/lib/archintel/api";
 
 interface CmdItem {
   id: string;
@@ -15,17 +15,11 @@ interface CmdItem {
   run: () => void;
 }
 
-export function CommandPalette({
-  open,
-  onOpenChange,
-  onAskAI,
-}: {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-  onAskAI: (q?: string) => void;
-}) {
+export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const navigate = useNavigate();
-  const { data: projects = [] } = useProjects();
+  const { data: projects = [] } = useAiProjects();
+  const { data: clients = [] } = useAiClients();
+  const { data: files = [] } = useAiFiles();
   const [q, setQ] = useState("");
   const [active, setActive] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
@@ -37,43 +31,27 @@ export function CommandPalette({
 
   const base: CmdItem[] = useMemo(() => {
     const actions: CmdItem[] = [
-      { id: "a-ask", label: "Ask Space Esse AI", hint: "Natural-language analytics", icon: Sparkles, group: "Actions", run: () => { onOpenChange(false); onAskAI(); } },
-      { id: "a-capture", label: "New capture", hint: "Log a decision, approval or effort", icon: PencilLine, group: "Actions", run: () => go("/capture") },
+      { id: "new", label: "New project", hint: "Create a project workspace", icon: Plus, group: "Actions", run: () => go("/projects/new") },
     ];
     const pages: CmdItem[] = NAV.flatMap((g) =>
-      g.items.map((it) => ({
-        id: `p-${it.to}`,
-        label: it.label,
-        hint: g.heading ?? "Navigate",
-        icon: it.icon,
-        group: "Pages",
-        run: () => go(it.to),
-      })),
+      g.items.map((it) => ({ id: `p-${it.to}`, label: it.label, hint: g.heading ?? "Go to", icon: it.icon, group: "Pages", run: () => go(it.to) })),
     );
     const projs: CmdItem[] = projects.map((p) => ({
-      id: `pr-${p.id}`,
-      label: p.name,
-      hint: `${p.code} · ${p.client}`,
-      icon: ArrowRight,
-      group: "Projects",
-      run: () => go(`/projects/${p.id}`),
+      id: `pr-${p.id}`, label: p.name, hint: `${p.code} · ${p.address}`, icon: Layers, group: "Projects", run: () => go(`/projects/${p.id}`),
     }));
-    return [...actions, ...pages, ...projs];
-  }, [projects]);
+    const clis: CmdItem[] = clients.map((c) => ({
+      id: `cl-${c.id}`, label: c.name, hint: "Client", icon: FolderOpen, group: "Clients", run: () => go(`/clients/${c.id}`),
+    }));
+    const fls: CmdItem[] = files.slice(0, 30).map((f) => ({
+      id: `fl-${f.id}`, label: f.name, hint: `${f.ext} · ${f.version}`, icon: FolderOpen, group: "Files", run: () => go("/files"),
+    }));
+    return [...actions, ...pages, ...projs, ...clis, ...fls];
+  }, [projects, clients, files]);
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    const matched = term
-      ? base.filter((i) => `${i.label} ${i.hint ?? ""}`.toLowerCase().includes(term))
-      : base;
-    if (term) {
-      return [
-        { id: "q-ask", label: `Ask AI: “${q}”`, hint: "Cited answer", icon: Sparkles, group: "Ask", run: () => { onOpenChange(false); onAskAI(q); } },
-        { id: "q-search", label: `Search everywhere for “${q}”`, hint: "Projects, invoices, people, decisions", icon: Search, group: "Ask", run: () => go(`/search?q=${encodeURIComponent(q)}`) },
-        ...matched,
-      ];
-    }
-    return matched;
+    if (!term) return base.filter((i) => i.group === "Actions" || i.group === "Pages");
+    return base.filter((i) => `${i.label} ${i.hint ?? ""}`.toLowerCase().includes(term));
   }, [q, base]);
 
   useEffect(() => {
@@ -83,6 +61,9 @@ export function CommandPalette({
     }
   }, [open]);
   useEffect(() => setActive(0), [q]);
+  useEffect(() => {
+    listRef.current?.querySelector(`[data-idx="${active}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [active]);
 
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
@@ -97,14 +78,7 @@ export function CommandPalette({
     }
   }
 
-  useEffect(() => {
-    const el = listRef.current?.querySelector(`[data-idx="${active}"]`);
-    el?.scrollIntoView({ block: "nearest" });
-  }, [active]);
-
-  // group consecutive items for headers
   let lastGroup = "";
-
   return (
     <RD.Root open={open} onOpenChange={onOpenChange}>
       <RD.Portal>
@@ -120,15 +94,13 @@ export function CommandPalette({
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search projects, pages, people — or ask the AI…"
+              placeholder="Search projects, clients, files, or jump to a page…"
               className="h-12 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-ghost"
             />
             <kbd className="rounded border border-line bg-bone-2 px-1.5 font-mono text-[11px] text-ink-faint">esc</kbd>
           </div>
           <div ref={listRef} className="max-h-[52vh] overflow-y-auto p-1.5">
-            {filtered.length === 0 && (
-              <div className="px-3 py-8 text-center text-sm text-ink-faint">No matches for “{q}”.</div>
-            )}
+            {filtered.length === 0 && <div className="px-3 py-8 text-center text-sm text-ink-faint">No matches for “{q}”.</div>}
             {filtered.map((it, i) => {
               const showGroup = it.group !== lastGroup;
               lastGroup = it.group;
@@ -139,10 +111,7 @@ export function CommandPalette({
                     data-idx={i}
                     onMouseEnter={() => setActive(i)}
                     onClick={() => it.run()}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-sm",
-                      i === active ? "bg-blue-tint text-blue" : "text-ink-soft",
-                    )}
+                    className={cn("flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-sm", i === active ? "bg-blue-tint text-blue" : "text-ink-soft")}
                   >
                     <it.icon className={cn("h-4 w-4 shrink-0", i === active ? "text-blue" : "text-ink-faint")} />
                     <span className="flex-1 truncate text-ink">{it.label}</span>
