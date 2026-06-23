@@ -13,6 +13,7 @@ const ProjectSetup = lazy(() => import("@/pages/app/ProjectSetup"));
 const ProjectWorkspace = lazy(() => import("@/pages/app/ProjectWorkspace"));
 const Approvals = lazy(() => import("@/pages/app/Approvals"));
 const Intelligence = lazy(() => import("@/pages/app/Intelligence"));
+const Automation = lazy(() => import("@/pages/app/Automation"));
 const Files = lazy(() => import("@/pages/app/Files"));
 const Finance = lazy(() => import("@/pages/app/Finance"));
 const Clients = lazy(() => import("@/pages/app/Clients"));
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="/projects/:id" element={<ProjectWorkspace />} />
           <Route path="/approvals" element={<Approvals />} />
           <Route path="/intelligence" element={<Intelligence />} />
+          <Route path="/automation" element={<Automation />} />
           <Route path="/files" element={<Files />} />
           <Route path="/finance" element={<Finance />} />
           <Route path="/clients" element={<Clients />} />

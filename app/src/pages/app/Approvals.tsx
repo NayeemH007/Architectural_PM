@@ -27,6 +27,7 @@ import {
   SubmissionStatusBadge,
   phaseShort,
 } from "@/components/archintel/badges";
+import { AgentChip } from "@/components/archintel/agent";
 import { useAiApprovals, useAiSubmissions } from "@/lib/archintel/api";
 import { approver, memberById, projectById } from "@/lib/archintel/data";
 import type {
@@ -126,6 +127,7 @@ export default function Approvals() {
           <span className="font-medium">{approver.name}</span> is the final approver for all
           design &amp; material decisions.
         </p>
+        <AgentChip className="ml-auto shrink-0 self-center" label="ArchIntel assembles each package" />
       </div>
 
       {/* KPI row */}

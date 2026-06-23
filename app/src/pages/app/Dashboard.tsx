@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
+  Sparkles,
 } from "lucide-react";
 import { Page, PageHeader, PageSection } from "@/components/page";
 import { KpiCard } from "@/components/kpi-card";
@@ -43,6 +44,10 @@ import {
 import type { ProjectA } from "@/lib/archintel/data";
 import { bdt, shortDate, daysFromNow } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { AiosKpiStrip } from "@/components/archintel/agent";
+import { useDailyBrief, useAiosKpis } from "@/lib/archintel/aios";
+
+const BRIEF_DOT: Record<string, string> = { rust: "bg-rust", ochre: "bg-ochre", blue: "bg-blue", sage: "bg-sage" };
 
 // severity dot colour for the Risk Radar
 const SEV_DOT: Record<string, string> = {
@@ -70,6 +75,8 @@ export default function Dashboard() {
   const { data: approvals, isLoading: loadingApprovals } = useAiApprovals();
   const { data: payments, isLoading: loadingPayments } = useAiPayments();
   const { data: risks, isLoading: loadingRisks } = useAiRisks();
+  const { data: brief } = useDailyBrief();
+  const { data: aiosK = [] } = useAiosKpis();
 
   // local interactive state: clearing an item off "today" without persistence
   const [cleared, setCleared] = useState<Record<string, boolean>>({});
@@ -129,6 +136,49 @@ export default function Dashboard() {
           </Link>
         }
       />
+
+      {/* ---- AI Daily Brief (AIOS) ---- */}
+      {brief && (
+        <Card className="mt-6 border-blue/25 bg-blue-ghost">
+          <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-blue text-paper">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="label-draft !text-blue">AI Daily Brief · {shortDate(TODAY)}</span>
+              <p className="mt-1.5 text-[15px] leading-relaxed text-ink">{brief.summary}</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {brief.needsYou.map((n) => (
+                  <Link
+                    key={n.id}
+                    to={n.projectId ? `/projects/${n.projectId}` : "/approvals"}
+                    className="flex items-start gap-2 rounded-md border border-line bg-paper px-3 py-2 transition-colors hover:border-blue/40"
+                  >
+                    <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", BRIEF_DOT[n.tone])} />
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-ink">{n.text}</div>
+                      <div className="text-xs text-ink-soft">{n.meta}</div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <Link to="/automation" className="inline-flex items-center gap-1 text-sm font-medium text-blue hover:underline">
+                  {brief.handled.length} tasks handled overnight <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+                <span className="text-xs text-ink-ghost">· propose → approve → execute</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* ---- AIOS KPIs ---- */}
+      {aiosK.length > 0 && (
+        <div className="mt-5">
+          <AiosKpiStrip kpis={aiosK} />
+        </div>
+      )}
 
       {/* ---- KPI row ---- */}
       <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">

@@ -10,6 +10,7 @@ import {
   Radar,
   Settings,
   Users,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 
@@ -30,6 +31,7 @@ export const NAV: NavGroup[] = [
     items: [
       { label: "Dashboard", to: "/", icon: LayoutDashboard },
       { label: "AI Radar", to: "/intelligence", icon: Radar, badge: "alert" },
+      { label: "Automation", to: "/automation", icon: Workflow, badge: "alert" },
       { label: "Projects", to: "/projects", icon: Layers },
       { label: "Approvals", to: "/approvals", icon: ClipboardCheck, badge: "alert" },
       { label: "Files", to: "/files", icon: FolderOpen },
