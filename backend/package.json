@@ -1,0 +1,13 @@
+{
+  "name": "archintel-backend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "SPACE ESSE · Practice Intelligence backend — canonical/mart over the live ArchIntel model. pglite test runtime.",
+  "scripts": {
+    "test": "node --test \"test/**/*.test.mjs\""
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.3"
+  }
+}
