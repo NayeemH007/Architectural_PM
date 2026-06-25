@@ -8,8 +8,12 @@
 // the BACKEND (separate repo). This models the experience.
 // ============================================================
 import { useQuery } from "@tanstack/react-query";
+import type { Confidence, Provenance } from "@/lib/types";
+import { projectsA, members } from "@/lib/archintel/data";
 
 export const TODAY = "2026-06-22";
+// Locked clock oracle (CONTEXT.md) — inject, never read the wall clock.
+const AS_OF = "2026-06-22T00:00:00.000Z";
 
 const LATENCY = 220;
 function resolve<T>(d: T): Promise<T> {
@@ -56,21 +60,99 @@ export function auditSummary(tasks: AuditTask[]) {
 }
 
 // ---- The 3 AIOS KPIs (studio version) ----
+// Each KPI now carries trust metadata (Slice 3): a `value` that may be null
+// (an honest refusal), a `confidence`, real provenance `sources`, and the
+// formula/note that explain it. Fabricated `trend`/`target` are dropped — a
+// sparkline of invented points is itself a fabrication.
 export interface AiosKpi {
   key: string;
   label: string;
-  value: number;
+  value: number | null;
   unit: "pct" | "ratio";
   sub: string;
-  trend: number[];
-  target: number;
+  confidence: Confidence;
+  completeness: number; // 0–100
+  asOf: string; // ISO
+  sources: Provenance[];
+  formula?: string;
+  note?: string;
+  trend?: number[]; // only present when a real series exists
+  target?: number; // only present when a real target exists
 }
 export function aiosKpis(): AiosKpi[] {
   const a = auditSummary(auditTasks);
+
+  // #1 `output` — COMPUTE → Metric. active projects ÷ design staff (designers).
+  // Recompute from the live arrays; never hardcode. 6 / 2 = 3.0 (NOT 1.5).
+  const active = projectsA.filter((p) => p.status === "active");
+  const designers = members.filter((m) => m.role === "designer");
+  const outputValue = active.length / designers.length;
+  const outputSources: Provenance[] = [
+    ...active.map((p) => ({
+      sourceId: "archintel-projects",
+      sourceName: "ArchIntel · Projects",
+      recordRef: `project:${p.id}`,
+      observedAt: AS_OF,
+    })),
+    ...designers.map((m) => ({
+      sourceId: "archintel-members",
+      sourceName: "ArchIntel · Members",
+      recordRef: `member:${m.id}`,
+      observedAt: AS_OF,
+    })),
+  ];
+
+  // #3 `automated` — still computed from auditSummary, but stamped low-confidence:
+  // the per-task status classification is editorial judgement, not observed.
+  const automatedSources: Provenance[] = auditTasks.map((t) => ({
+    sourceId: "archintel-audit",
+    sourceName: "ArchIntel · Task Audit",
+    recordRef: `auditTask:${t.id}`,
+    observedAt: AS_OF,
+  }));
+
   return [
-    { key: "autonomy", label: "Studio autonomy", value: 64, unit: "pct", sub: "gates · approvals · payments moving without a principal chasing", trend: [38, 44, 49, 55, 60, 64], target: 80 },
-    { key: "automated", label: "Coordination automated", value: a.pct, unit: "pct", sub: `${a.automated} of ${a.total} recurring tasks · ~${a.hrsSaved} hrs/wk saved`, trend: [10, 25, 40, 55, 68, a.pct], target: 90 },
-    { key: "output", label: "Output per designer", value: 1.5, unit: "ratio", sub: "active projects per designer — rises as overhead falls", trend: [0.9, 1.0, 1.1, 1.3, 1.4, 1.5], target: 2 },
+    // #2 `autonomy` — REFUSE. No signal exists to measure it; don't fabricate 64.
+    {
+      key: "autonomy",
+      label: "Studio autonomy",
+      value: null,
+      unit: "pct",
+      sub: "gates · approvals · payments moving without a principal chasing",
+      confidence: "insufficient",
+      completeness: 0,
+      asOf: AS_OF,
+      sources: [],
+      note: "No signal yet — needs an intervention/escalation log (who chased which gate/approval/payment) to measure autonomy. Not estimated.",
+    },
+    // #3 `automated` — COMPUTE, stamped low (editorial classification).
+    {
+      key: "automated",
+      label: "Coordination automated",
+      value: a.pct,
+      unit: "pct",
+      sub: `${a.automated} of ${a.total} recurring tasks · ~${a.hrsSaved} hrs/wk saved`,
+      confidence: "low",
+      completeness: 100,
+      asOf: AS_OF,
+      sources: automatedSources,
+      formula: "(#automated + 0.5·#assisted) ÷ total recurring tasks",
+      note: "Based on editorial task-status classification, not an observed automation rate.",
+    },
+    // #1 `output` — COMPUTE → Metric. value === active ÷ designers === 3.0.
+    {
+      key: "output",
+      label: "Output per designer",
+      value: outputValue,
+      unit: "ratio",
+      sub: "active projects per designer (design-production staff) — rises as overhead falls",
+      confidence: "low",
+      completeness: 100,
+      asOf: AS_OF,
+      sources: outputSources,
+      formula: "active projects ÷ design staff (role='designer')",
+      note: "Head-count load per designer, not a productivity measure. Design staff = the two designer-role members.",
+    },
   ];
 }
 
@@ -118,7 +200,7 @@ export function dailyBrief(): DailyBrief {
       "I handled 5 coordination tasks for you overnight. 3 things need a human: Raiana has 4 approvals waiting, Tejgaon is at risk of stalling, and 2 drafts are ready for you to send.",
     needsYou: [
       { id: "n1", text: "Raiana — 4 design/material approvals waiting", meta: "1 is blocking Tejgaon's layout freeze", projectId: "a5", tone: "ochre" },
-      { id: "n2", text: "Tejgaon Office likely to stall (86%)", meta: "overdue payment + pending freeze on the same gate", projectId: "a5", tone: "rust" },
+      { id: "n2", text: "Tejgaon Office — high concern, likely to stall", meta: "overdue payment + pending freeze on the same gate", projectId: "a5", tone: "rust" },
       { id: "n3", text: "2 AI drafts ready to send", meta: "Gulshan client update · MediCare BOQ", projectId: "a1", tone: "blue" },
       { id: "n4", text: "Gulshan Phase-3 payment due in 3 days", meta: "gated on the pending material approval", projectId: "a1", tone: "ochre" },
     ],

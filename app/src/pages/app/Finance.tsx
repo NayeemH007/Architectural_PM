@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { TrendingUp, TrendingDown, AlertTriangle, Receipt, Building2 } from "lucide-react";
+import { TrendingUp, TrendingDown, AlertTriangle, Receipt, Building2, Info } from "lucide-react";
 import { Page, PageHeader } from "@/components/page";
 import { KpiCard } from "@/components/kpi-card";
 import {
@@ -18,6 +18,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { EmptyState } from "@/components/states";
 import { PaymentStatusBadge, phaseShort } from "@/components/archintel/badges";
+import { ConfidenceMeter, ProvenancePopover } from "@/components/trust";
 import { AreaTrend, BarSeries, Donut, CHART } from "@/components/charts";
 import {
   useAiFinance,
@@ -75,36 +76,19 @@ export default function Finance() {
           <>
             <KpiCard
               kicker="Income received"
-              value={bdt(fin.income, { compact: true })}
-              footnote={
-                <span className="text-xs text-ink-ghost">
-                  of {bdt(fin.billable, { compact: true })} billed
-                </span>
-              }
+              metric={fin.income}
             />
             <KpiCard
               kicker="Receivables outstanding"
-              value={bdt(fin.receivables, { compact: true })}
-              footnote={
-                <span className="text-xs text-ink-ghost">across active plans</span>
-              }
+              metric={fin.receivables}
             />
             <KpiCard
               kicker="Overdue"
-              value={<span className="text-rust">{bdt(fin.overdue, { compact: true })}</span>}
-              footnote={
-                <span className="text-xs text-rust">
-                  {payments.filter((p) => p.status === "overdue").length} milestone
-                  {payments.filter((p) => p.status === "overdue").length === 1 ? "" : "s"}
-                </span>
-              }
+              metric={fin.overdue}
             />
             <KpiCard
               kicker="Collection rate"
-              value={`${fin.collectionRate}%`}
-              footnote={
-                <span className="text-xs text-ink-ghost">received ÷ billed</span>
-              }
+              metric={fin.collectionRate}
             />
           </>
         )}
@@ -174,12 +158,12 @@ export default function Finance() {
                       <CashRow
                         icon={<TrendingUp className="h-4 w-4 text-sage" />}
                         label="YTD income"
-                        value={bdt(fin.ytdIncome, { compact: true })}
+                        value={bdt(fin.ytdIncome.value ?? 0, { compact: true })}
                       />
                       <CashRow
                         icon={<TrendingDown className="h-4 w-4 text-sienna" />}
                         label="YTD expense"
-                        value={bdt(fin.ytdExpense, { compact: true })}
+                        value={bdt(fin.ytdExpense.value ?? 0, { compact: true })}
                       />
                       <Separator />
                       <div className="flex items-center justify-between">
@@ -187,19 +171,28 @@ export default function Finance() {
                         <span
                           className={cn(
                             "font-display text-xl tnum",
-                            fin.ytdNet >= 0 ? "text-sage" : "text-rust",
+                            (fin.ytdNet.value ?? 0) >= 0 ? "text-sage" : "text-rust",
                           )}
                         >
-                          {bdt(fin.ytdNet, { compact: true })}
+                          {bdt(fin.ytdNet.value ?? 0, { compact: true })}
                         </span>
                       </div>
                       <p className="text-xs text-ink-ghost">
                         This month net{" "}
-                        <span className={fin.monthNet >= 0 ? "text-sage tnum" : "text-rust tnum"}>
-                          {bdt(fin.monthNet, { compact: true })}
+                        <span className={(fin.monthNet.value ?? 0) >= 0 ? "text-sage tnum" : "text-rust tnum"}>
+                          {bdt(fin.monthNet.value ?? 0, { compact: true })}
                         </span>{" "}
-                        on {bdt(fin.monthIncome, { compact: true })} in.
+                        on {bdt(fin.monthIncome.value ?? 0, { compact: true })} in.
                       </p>
+                      <div
+                        className="flex items-start gap-1.5 rounded-md border border-line bg-paper-2 px-2.5 py-1.5"
+                        title={fin.ytdIncome.note}
+                      >
+                        <Info className="mt-0.5 h-3 w-3 shrink-0 text-ink-faint" />
+                        <span className="text-[11px] leading-snug text-ink-faint">
+                          Manually captured — illustrative, not yet reconciled to TallyPrime.
+                        </span>
+                      </div>
                     </div>
                   )}
                 </CardContent>
@@ -220,21 +213,21 @@ export default function Finance() {
                     <div className="space-y-3">
                       <BreakdownBar
                         label="Overdue"
-                        amount={fin.overdue}
-                        total={fin.receivables || 1}
+                        amount={fin.overdue.value ?? 0}
+                        total={(fin.receivables.value ?? 0) || 1}
                         tone="bg-rust"
                       />
                       <BreakdownBar
                         label="Not yet due"
-                        amount={Math.max(fin.receivables - fin.overdue, 0)}
-                        total={fin.receivables || 1}
+                        amount={Math.max((fin.receivables.value ?? 0) - (fin.overdue.value ?? 0), 0)}
+                        total={(fin.receivables.value ?? 0) || 1}
                         tone="bg-blue"
                       />
                       <Separator />
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-ink">Total outstanding</span>
                         <span className="font-display text-lg text-ink tnum">
-                          {bdt(fin.receivables, { compact: true })}
+                          {bdt(fin.receivables.value ?? 0, { compact: true })}
                         </span>
                       </div>
                     </div>
@@ -453,17 +446,22 @@ export default function Finance() {
                             {bdt(r.profit, { compact: true })}
                           </TD>
                           <TD className="text-right">
-                            <span
-                              className={cn(
-                                "tnum font-medium",
-                                r.margin >= 40
-                                  ? "text-sage"
-                                  : r.margin >= 20
-                                    ? "text-ochre"
-                                    : "text-rust",
-                              )}
-                            >
-                              {r.margin}%
+                            <span className="inline-flex items-center justify-end gap-1.5">
+                              <span
+                                className={cn(
+                                  "tnum font-medium",
+                                  (r.margin.value ?? 0) >= 40
+                                    ? "text-sage"
+                                    : (r.margin.value ?? 0) >= 20
+                                      ? "text-ochre"
+                                      : "text-rust",
+                                )}
+                                title={r.margin.note}
+                              >
+                                {r.margin.value}%
+                              </span>
+                              <ConfidenceMeter level={r.margin.confidence} />
+                              <ProvenancePopover metric={r.margin} />
                             </span>
                           </TD>
                         </TR>

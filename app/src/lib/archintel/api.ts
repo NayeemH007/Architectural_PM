@@ -16,10 +16,44 @@ import {
 } from "./data";
 import { predictedRisks, riskInsights, stageRisk } from "./intelligence";
 import { expenses, financeOverview, monthlyFlow, profitabilityByProject, expenseByCategory } from "./finance";
+import type { Metric, Provenance } from "@/lib/types";
+
+// Locked clock oracle (CONTEXT.md ⑤ / clock as_of). Injected — never read the wall clock.
+const AS_OF = "2026-06-22T00:00:00.000Z";
 
 const LATENCY = 240;
 function resolve<T>(data: T): Promise<T> {
   return new Promise((res) => setTimeout(() => res(JSON.parse(JSON.stringify(data))), LATENCY));
+}
+
+// ---- Slice 2b: flag-gated data source for the management overview (⑦ seam swap) ----
+// Default OFF keeps `vite build` / deploy unaffected: with the flag off the dev/build
+// path never fetches and Slice-2a behaviour is byte-identical (mock seam, unchanged).
+const USE_BACKEND_AI = import.meta.env.VITE_USE_BACKEND_AI === "true";
+const BACKEND_AI_URL =
+  (import.meta.env.VITE_BACKEND_AI_URL as string | undefined) ?? "http://localhost:8787";
+// Locked demo principal (finance-eligible so the overdue card stays visible).
+// Per-user finance gating is deferred to the Auth & Finance Gating manager (Step 2).
+const FIRM_A = "00000000-0000-0000-0000-00000000aaaa";
+
+/**
+ * fetchOverview — the ⑦ seam wrapper for the management overview.
+ *   OFF (default) → resolve(managementOverview()), the Slice-2a mock Metric (unchanged).
+ *   ON            → fetch the pglite backend overview (same Metric shape); mock fallback
+ *                   on any failure so the card never blanks.
+ * Returns the SAME overview shape either way (overdueAmount is a Metric).
+ */
+export async function fetchOverview() {
+  if (!USE_BACKEND_AI) return resolve(managementOverview());
+  try {
+    const res = await fetch(`${BACKEND_AI_URL}/api/v1/overview`, {
+      headers: { "X-Company-Id": FIRM_A, "X-User-Role": "founder" },
+    });
+    if (!res.ok) throw new Error(`backend ${res.status}`);
+    return await res.json();
+  } catch {
+    return resolve(managementOverview());
+  }
 }
 
 // ---- derived ----
@@ -39,22 +73,81 @@ export function managementOverview() {
   const active = projectsA.filter((p) => p.status === "active");
   const pending = approvalsA.filter((a) => a.status === "pending");
   const overdue = payments.filter((p) => p.status === "overdue");
-  const overdueAmount = overdue.reduce((s, p) => s + (p.amount - p.receivedAmount), 0);
+  // One Provenance per overdue milestone — REAL refs into TallyPrime (drillable).
+  const overdueSources: Provenance[] = overdue.map((pm) => ({
+    sourceId: "tally",
+    sourceName: "TallyPrime",
+    recordRef: `tally:${pm.id}`, // e.g. "tally:pm10" — contains the real milestone id
+    observedAt: pm.dueDate, // when the unpaid milestone became true
+  }));
+  const grossOverdue = overdue.reduce((s, p) => s + (p.amount - p.receivedAmount), 0);
+  // overdueAmount is a cited, low-confidence Metric (promise ① + ⑤ tax DEFERRED → gross).
+  // value MUST equal Σ over the milestones the sources cite (VALUE = Σ LINEAGE).
+  const overdueAmount: Metric = {
+    value: grossOverdue,
+    unit: "bdt",
+    label: `Overdue payments (gross) — ${overdue.length} milestone${overdue.length === 1 ? "" : "s"}`,
+    confidence: "low", // ⑤ tax DEFERRED → gross figure is low-trust
+    completeness: 100, // gross-complete at the milestone grain (not net)
+    asOf: AS_OF,
+    formula: "Σ (gross_amount − received_amount) over status='overdue' milestones",
+    note: "Gross overdue receivable — VAT/VDS/AIT withholding not modeled.",
+    sources: overdueSources,
+  };
   const blocked = active.filter((p) => p.health === "at_risk" || p.phases.some((ph) => ph.status === "blocked"));
   const totalContract = active.reduce((s, p) => s + p.contractValue, 0);
   const received = payments.reduce((s, p) => s + p.receivedAmount, 0);
   const billable = payments.reduce((s, p) => s + p.amount, 0);
+  // B2: pendingApprovals — a complete, fully-observed count of internal approval
+  // records → cited Metric, confidence:'high'. One Provenance per pending approval
+  // (recordRef contains the real approval id → VALUE = Σ lineage drillable).
+  const pendingSources: Provenance[] = pending.map((a) => ({
+    sourceId: "approvals",
+    sourceName: "ArchIntel · Approvals",
+    recordRef: `approval:${a.id}`, // e.g. "approval:ap1"
+    observedAt: a.submittedDate,
+  }));
+  const pendingApprovals: Metric = {
+    value: pending.length,
+    unit: "count",
+    label: "Pending approvals",
+    confidence: "high", // a direct, complete count of internal records — no estimation
+    completeness: 100,
+    asOf: AS_OF,
+    formula: "count(approvals where status='pending')",
+    sources: pendingSources,
+  };
+  // B1: collectionRate — gross low-confidence Metric (⑤ tax DEFERRED → receipts are
+  // face value, withholding not modeled). value === Σreceived ÷ Σbillable × 100 over
+  // payments. One Provenance per contributing payment milestone (drillable lineage).
+  const collectionSources: Provenance[] = payments.map((pm) => ({
+    sourceId: "tally",
+    sourceName: "TallyPrime",
+    recordRef: `tally:${pm.id}`,
+    observedAt: pm.dueDate,
+  }));
+  const collectionRate: Metric = {
+    value: billable ? Math.round((received / billable) * 100) : 0,
+    unit: "pct",
+    label: "Collection rate (gross)",
+    confidence: "low", // ⑤ gross — withholding not modeled
+    completeness: 100,
+    asOf: AS_OF,
+    formula: "Σ received ÷ Σ billable (gross)",
+    note: "Gross collection — VAT/VDS/AIT withholding not modeled.",
+    sources: collectionSources,
+  };
   return {
     activeCount: active.length,
     completedCount: projectsA.filter((p) => p.status === "archived").length,
-    pendingApprovals: pending.length,
+    pendingApprovals,
     overdueCount: overdue.length,
     overdueAmount,
     blockedCount: blocked.length,
     totalContract,
     received,
     billable,
-    collectionRate: billable ? Math.round((received / billable) * 100) : 0,
+    collectionRate,
   };
 }
 
@@ -79,7 +172,7 @@ export const useAiSubmissions = () => useQuery({ queryKey: ["ai-subs"], queryFn:
 export const useAiPayments = () => useQuery({ queryKey: ["ai-payments"], queryFn: () => resolve(payments) });
 export const useAiDecisions = () => useQuery({ queryKey: ["ai-decisions"], queryFn: () => resolve(decisionsA) });
 export const useAiActivity = () => useQuery({ queryKey: ["ai-activity"], queryFn: () => resolve(activityA) });
-export const useAiOverview = () => useQuery({ queryKey: ["ai-overview"], queryFn: () => resolve(managementOverview()) });
+export const useAiOverview = () => useQuery({ queryKey: ["ai-overview"], queryFn: () => fetchOverview() });
 
 // risk intelligence
 export const useAiRisks = () => useQuery({ queryKey: ["ai-risks"], queryFn: () => resolve(predictedRisks) });

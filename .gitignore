@@ -16,6 +16,9 @@ dist-ssr/
 screens/
 **/screens/
 
+# backend — lives in its OWN repo (do NOT push into the frontend repo)
+backend/
+
 # os / editor
 .DS_Store
 Thumbs.db
