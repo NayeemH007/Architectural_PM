@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "contract": "vitest run src/lib/archintel/__tests__/contract-ci-and-prod-port.design.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.2",

@@ -5,9 +5,8 @@
 // ============================================================
 import { payments, projectsA, projectById } from "./data";
 import type { Metric, Provenance } from "@/lib/types";
-
-// Locked clock oracle (CONTEXT.md ⑤ / clock as_of). Injected — never read the wall clock.
-const AS_OF = "2026-06-22T00:00:00.000Z";
+// Single clock authority (CONTEXT.md ⑤ / clock as_of). Injected — see lib/clock.ts.
+import { AS_OF } from "@/lib/clock";
 
 export type ExpenseCategory = "salaries" | "rent" | "software" | "utilities" | "vendor" | "marketing" | "misc";
 

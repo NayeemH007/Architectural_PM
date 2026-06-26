@@ -32,6 +32,12 @@ const MONEY_KEYS = new Set(
     "total_contract",
     "received",
     "billable",
+    // Bare profitability-row money columns (serializeProfitability is the only
+    // consumer; R1 leak — these were absent so contract/cost/profit passed raw).
+    "contract",
+    "cost",
+    "profit",
+    "income", // S3 finance family (income received, gross) — redact for non-finance
     "collection_rate",
     "collectionRate",
     "receivables",
@@ -42,22 +48,33 @@ const MONEY_KEYS = new Set(
   ].map((k) => k.toLowerCase()),
 );
 
-function isFinanceEligible(principal) {
+export function isFinanceEligible(principal) {
   if (!principal || typeof principal !== "object") return false;
   const role = String(principal.role ?? "").toLowerCase();
   if (role === "founder" || role === "finance") return true;
-  // future-proof: an explicit finance grant flips the band on.
+  // PD-A: an explicit per-member finance grant flips the band on (m1+m2 seeded
+  // finance_grant=true). Accept both camel and snake casing.
   if (principal.financeGrant === true) return true;
+  if (principal.finance_grant === true) return true;
   return false;
 }
 
-function isMoneyKey(key) {
+export function isMoneyKey(key) {
   return MONEY_KEYS.has(String(key).toLowerCase());
 }
+export { MONEY_KEYS };
 
 // A Metric envelope is { value, confidence, ... } (types.ts:50-62).
 function isMetric(v) {
   return v && typeof v === "object" && "value" in v && "confidence" in v;
+}
+
+// A plain object/array we may safely RECURSE into (R1: redact nested money like
+// project.contractValue). Excludes Date/RegExp/Map/etc. — only {}-literals and [].
+function isPlainObject(v) {
+  if (v == null || typeof v !== "object") return false;
+  const proto = Object.getPrototypeOf(v);
+  return proto === Object.prototype || proto === null;
 }
 
 // Refused Metric for a non-finance principal: preserves non-money metadata
@@ -71,7 +88,7 @@ function refuseMetric(metric) {
  * Finance-eligible → returned as-is. Non-finance → money keys omitted; money
  * Metrics rewritten to the refusal shape.
  */
-function redactRow(row, principal) {
+export function redactRow(row, principal) {
   if (row == null || typeof row !== "object") return row;
   if (isFinanceEligible(principal)) return { ...row };
 
@@ -85,7 +102,21 @@ function redactRow(row, principal) {
       // Otherwise OMIT entirely (absent, not present-with-null).
       continue;
     }
-    out[k] = v;
+    // R1: non-money key carrying a NESTED structure must also be band-filtered —
+    // a designer must not get project.contractValue via the nested `project` sub-
+    // object. RECURSE into plain objects (NOT Metric envelopes — a non-money
+    // Metric like healthScore stays intact) and arrays of plain non-Metric objects.
+    if (isMetric(v)) {
+      out[k] = v; // non-money Metric → pass through whole (do not recurse)
+    } else if (Array.isArray(v)) {
+      out[k] = v.map((el) =>
+        isPlainObject(el) && !isMetric(el) ? redactRow(el, principal) : el,
+      );
+    } else if (isPlainObject(v)) {
+      out[k] = redactRow(v, principal);
+    } else {
+      out[k] = v; // scalar / Date / other non-plain object → verbatim
+    }
   }
   return out;
 }
@@ -164,4 +195,18 @@ export function serializeClients(rows, principal) {
   return rows.map((r) => redactRow(r, principal));
 }
 
-export default { serializeOverview, serializeClients };
+/**
+ * serializeProjects(rows, principal) -> array  (fin-* field-level gating)
+ * serializeMilestones(rows, principal) -> array
+ * Reuse the SAME finance band as serializeOverview/serializeClients: a
+ * non-finance principal's rows OMIT every money key (absent, not null); a
+ * finance-eligible principal's rows pass money through unchanged.
+ */
+export function serializeProjects(rows, principal) {
+  return Array.isArray(rows) ? rows.map((r) => redactRow(r, principal)) : [];
+}
+export function serializeMilestones(rows, principal) {
+  return Array.isArray(rows) ? rows.map((r) => redactRow(r, principal)) : [];
+}
+
+export default { serializeOverview, serializeClients, serializeProjects, serializeMilestones };

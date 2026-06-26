@@ -7,7 +7,8 @@
 // and a completed-project archive.
 // ============================================================
 
-export const TODAY = "2026-06-22";
+// Single clock authority — re-export the canonical as_of (see lib/clock.ts).
+export { AS_OF_DATE as TODAY } from "@/lib/clock";
 
 export const workspace = {
   product: "ArchIntel",

@@ -37,6 +37,7 @@ import type {
   DesignApproval,
 } from "@/lib/archintel/data";
 import { shortDate } from "@/lib/format";
+import { AS_OF_DATE as TODAY } from "@/lib/clock";
 import { cn } from "@/lib/cn";
 
 // ---- local decision state laid over the mock approvals ----
@@ -45,7 +46,6 @@ type LocalDecision = {
   comment: string;
   date: string;
 };
-const TODAY = "2026-06-22";
 
 const TYPE_TONE: Record<ApprovalType, "blue" | "sage" | "ochre" | "sienna" | "neutral"> = {
   concept: "blue",

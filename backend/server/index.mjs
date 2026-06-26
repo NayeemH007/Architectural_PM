@@ -18,6 +18,10 @@ import http from "node:http";
 import { PGlite } from "@electric-sql/pglite";
 import { applyMigrations, runSeed } from "../test/harness.mjs";
 import { serializeOverview } from "../semantic/serialize.mjs";
+import { serializeFinance, serializeOverviewMoney } from "../semantic/finance.mjs";
+import { serializeProfitability } from "../semantic/profitability.mjs";
+import { serializeAiosKpis } from "../semantic/aios.mjs";
+import { servePayments, serveProjects, serveClients } from "../semantic/arrays.mjs";
 
 // Locked constants (mirror harness.mjs / CONTEXT.md).
 const FIRM_A = "00000000-0000-0000-0000-00000000aaaa";
@@ -97,6 +101,21 @@ async function buildOverviewPayload(db, principal) {
   return serializeOverview(summaryRow, linRes.rows, principal);
 }
 
+// ── S3 derived-endpoint route table: path → serializer(db, asOf, principal). ──
+// Mirrors the overview pattern. The aios family is operational (no finance band);
+// the ai-* families apply the band inside their serializer. Each serializer sets
+// request.* itself (the overview branch sets them via buildOverviewPayload). The
+// per-request set_config in each serializer reuses the warm-db reset discipline.
+const DERIVED_ROUTES = {
+  "/api/v1/finance": serializeFinance,
+  "/api/v1/overview-money": serializeOverviewMoney, // A-5 received/total_contract/billable
+  "/api/v1/profitability": serializeProfitability,
+  "/api/v1/payments": servePayments,
+  "/api/v1/projects": serveProjects,
+  "/api/v1/clients": serveClients,
+  "/api/v1/aios/kpis": serializeAiosKpis,
+};
+
 /**
  * createHandler(db) → (req, res) Node request handler bound to a warm db.
  * GET /api/v1/overview → 200 JSON; OPTIONS → 204 preflight; other → 404;
@@ -119,6 +138,20 @@ export function createHandler(db) {
         // eslint-disable-next-line no-console
         console.log(
           `[overview] company=${principal.companyId} role=${principal.role || "(none)"} -> 200`,
+        );
+        sendJson(res, 200, payload);
+        return;
+      }
+
+      // ── S3 derived endpoints: each header→principal, company-scoped, recompute
+      //    at the pinned clock, serialize (finance band where applicable). ──
+      if (req.method === "GET" && DERIVED_ROUTES[url.pathname]) {
+        const principal = principalFromHeaders(req);
+        const fn = DERIVED_ROUTES[url.pathname];
+        const payload = await fn(db, AS_OF_PINNED, principal);
+        // eslint-disable-next-line no-console
+        console.log(
+          `[${url.pathname}] company=${principal.companyId} role=${principal.role || "(none)"} -> 200`,
         );
         sendJson(res, 200, payload);
         return;

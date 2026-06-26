@@ -10,14 +10,36 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Confidence, Provenance } from "@/lib/types";
 import { projectsA, members } from "@/lib/archintel/data";
-
-export const TODAY = "2026-06-22";
-// Locked clock oracle (CONTEXT.md) — inject, never read the wall clock.
-const AS_OF = "2026-06-22T00:00:00.000Z";
+// Single clock authority — inject, never read the wall clock (see lib/clock.ts).
+import { AS_OF, AS_OF_DATE as TODAY } from "@/lib/clock";
+export { TODAY };
 
 const LATENCY = 220;
 function resolve<T>(d: T): Promise<T> {
   return new Promise((r) => setTimeout(() => r(JSON.parse(JSON.stringify(d))), LATENCY));
+}
+
+// ---- Slice 3 (S3): flag-gated backend seam for the AIOS KPIs (⑦ seam swap) ----
+// Default OFF keeps `vite build` / deploy unaffected (mock seam, byte-identical).
+// ON → fetch the pglite backend /api/v1/aios/kpis (same AiosKpi[] shape: autonomy
+// refused / output 3.0 / automated low); mock fallback on ANY failure so a card
+// never blanks. Operational (not money-gated); the demo principal is a founder.
+const USE_BACKEND_AIOS = import.meta.env.VITE_USE_BACKEND_AIOS === "true";
+const BACKEND_AI_URL =
+  (import.meta.env.VITE_BACKEND_AI_URL as string | undefined) ?? "http://localhost:8787";
+const FIRM_A = "00000000-0000-0000-0000-00000000aaaa";
+
+export async function fetchAiosKpis(): Promise<AiosKpi[]> {
+  if (!USE_BACKEND_AIOS) return resolve(aiosKpis());
+  try {
+    const res = await fetch(`${BACKEND_AI_URL}/api/v1/aios/kpis`, {
+      headers: { "X-Company-Id": FIRM_A, "X-User-Role": "founder" },
+    });
+    if (!res.ok) throw new Error(`backend ${res.status}`);
+    return (await res.json()) as AiosKpi[];
+  } catch {
+    return resolve(aiosKpis());
+  }
 }
 
 // ---- Task Audit (Layer 4) ----
@@ -35,11 +57,11 @@ export interface AuditTask {
 }
 
 export const auditTasks: AuditTask[] = [
-  { id: "t1", title: "Chase client for approval on WhatsApp + log the reply", owner: "Project Lead", cadence: "Per submission", minPerWeek: 90, automatable: "high", humanGate: false, behavior: "Sends the reminder, captures the reply into the client-approval record, advances status.", status: "automated" },
+  { id: "t1", title: "Chase client for approval on WhatsApp + log the reply", owner: "Project Lead", cadence: "Per submission", minPerWeek: 90, automatable: "high", humanGate: true, behavior: "Sends the reminder, captures the reply into the client-approval record, advances status.", status: "automated" },
   { id: "t2", title: "Nudge Raiana's pending queue + assemble the approval package", owner: "Fariha / Lead", cadence: "Daily", minPerWeek: 75, automatable: "high", humanGate: true, behavior: "Compiles the design/material package and queues it for Raiana. Never decides.", status: "automated" },
-  { id: "t3", title: "Chase overdue payments + flag 'progressing without payment'", owner: "Fariha / Finance", cadence: "Weekly", minPerWeek: 60, automatable: "high", humanGate: false, behavior: "Detects overdue milestones, drafts a polite reminder, flags the project gate.", status: "automated" },
-  { id: "t4", title: "Keep the file register current + version + move finished files central", owner: "Everyone", cadence: "Continuous", minPerWeek: 120, automatable: "high", humanGate: false, behavior: "Watches Drive, versions files, registers them, flags local-only / single-person files.", status: "automated" },
-  { id: "t5", title: "Phase-gate checklist nudges to the owner", owner: "Project Lead", cadence: "Per phase", minPerWeek: 45, automatable: "high", humanGate: false, behavior: "Nudges on incomplete gate items; blocks advance until the gate clears.", status: "automated" },
+  { id: "t3", title: "Chase overdue payments + flag 'progressing without payment'", owner: "Fariha / Finance", cadence: "Weekly", minPerWeek: 60, automatable: "high", humanGate: true, behavior: "Detects overdue milestones, drafts a polite reminder, flags the project gate.", status: "automated" },
+  { id: "t4", title: "Keep the file register current + version + move finished files central", owner: "Everyone", cadence: "Continuous", minPerWeek: 120, automatable: "high", humanGate: true, behavior: "Watches Drive, versions files, registers them, flags local-only / single-person files.", status: "automated" },
+  { id: "t5", title: "Phase-gate checklist nudges to the owner", owner: "Project Lead", cadence: "Per phase", minPerWeek: 45, automatable: "high", humanGate: true, behavior: "Nudges on incomplete gate items; blocks advance until the gate clears.", status: "automated" },
   { id: "t6", title: "Draft the weekly client update / status", owner: "Project Lead", cadence: "Weekly", minPerWeek: 80, automatable: "high", humanGate: true, behavior: "Drafts from the week's activity; a human reviews and sends.", status: "assisted" },
   { id: "t7", title: "Compile requirement doc / finish schedule / BOQ draft", owner: "Lead / Fariha", cadence: "Per project", minPerWeek: 110, automatable: "medium", humanGate: true, behavior: "Drafts the first version from inputs; a human refines (creative execution, accelerated).", status: "assisted" },
   { id: "t8", title: "Capture decisions / scope changes from WhatsApp & calls", owner: "Project Lead", cadence: "Continuous", minPerWeek: 70, automatable: "high", humanGate: true, behavior: "Extracts into a structured Decision / Change record; a human confirms.", status: "assisted" },
@@ -212,6 +234,6 @@ export function dailyBrief(): DailyBrief {
 
 // ---- hooks ----
 export const useTaskAudit = () => useQuery({ queryKey: ["aios-audit"], queryFn: () => resolve(auditTasks) });
-export const useAiosKpis = () => useQuery({ queryKey: ["aios-kpis"], queryFn: () => resolve(aiosKpis()) });
+export const useAiosKpis = () => useQuery({ queryKey: ["aios-kpis"], queryFn: () => fetchAiosKpis() });
 export const useDailyBrief = () => useQuery({ queryKey: ["aios-brief"], queryFn: () => resolve(dailyBrief()) });
 export const useAgentActions = () => useQuery({ queryKey: ["aios-actions"], queryFn: () => resolve(agentActions) });
