@@ -23,6 +23,7 @@
 // shared redactRow machinery (margin is already a MONEY_KEY).
 // ============================================================
 import { redactRow } from "./serialize.mjs";
+import { buildProjectA, teamIdsByProject } from "./arrays.mjs";
 
 const KPI_VERSION = 1;
 const MARGIN_NOTE = "Fee-only margin — no labour cost; PROJECT_COST is a modeled input, not measured.";
@@ -56,8 +57,11 @@ export async function serializeProfitability(db, asOf, principal) {
   const marginRows = linRes.rows.filter((r) => String(r.company_id) === String(v_company));
 
   // Project + cost facts for the row body (contract / received / cost / profit).
+  // Select the FULL ProjectA column set so the nested `project` sub-object can be
+  // reconstructed to the live ProjectA shape (describeShape parity, F5).
   const projRes = await db.query(
-    `select p.id, p.code, p.name, p.contract_value, p.status, p.company_id,
+    `select p.id, p.code, p.name, p.client_id, p.lead_id, p.type, p.status,
+            p.current_phase, p.contract_value, p.health, p.blocker, p.company_id,
             coalesce(cm.modeled_cost, 0) as modeled_cost,
             coalesce(rcv.received, 0)    as received
        from canonical.project p
@@ -75,6 +79,7 @@ export async function serializeProfitability(db, asOf, principal) {
     [v_company],
   );
   const projects = projRes.rows.filter((r) => String(r.company_id) === String(v_company));
+  const teams = await teamIdsByProject(db, v_company);
 
   const marginByProject = new Map(marginRows.map((r) => [r.entity_id, r]));
 
@@ -110,9 +115,12 @@ export async function serializeProfitability(db, asOf, principal) {
       ],
     };
 
-    // Mirror the frontend row shape (finance.ts:156). `project` carries id/code/name.
+    // Mirror the frontend row shape (finance.ts:156): `project` carries the FULL
+    // live ProjectA field set (describeShape parity), plus contract/received/cost/
+    // profit/margin. redactRow runs AFTER → recursive redaction omits the nested
+    // project.contractValue + the bare money columns for a designer (R1 band).
     const row = {
-      project: { id: p.id, code: p.code, name: p.name, status: p.status, contractValue: contract },
+      project: buildProjectA(p, teams.get(p.id) ?? []),
       contract,
       received,
       cost,

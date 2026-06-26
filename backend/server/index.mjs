@@ -17,7 +17,7 @@
 import http from "node:http";
 import { PGlite } from "@electric-sql/pglite";
 import { applyMigrations, runSeed } from "../test/harness.mjs";
-import { serializeOverview } from "../semantic/serialize.mjs";
+import { serializeOverviewFull } from "../semantic/serialize.mjs";
 import { serializeFinance, serializeOverviewMoney } from "../semantic/finance.mjs";
 import { serializeProfitability } from "../semantic/profitability.mjs";
 import { serializeAiosKpis } from "../semantic/aios.mjs";
@@ -73,9 +73,86 @@ function sendJson(res, status, body, extraHeaders = {}) {
   res.end(payload);
 }
 
+// Coerce a pg date/timestamptz (Date | ISO string) to a non-empty ISO string.
+function toIso(v) {
+  if (v == null) return "";
+  if (v instanceof Date) return v.toISOString();
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? String(v) : d.toISOString();
+}
+
 /**
- * Recompute the portfolio summary for the principal at the pinned clock,
- * read back the summary row + its overdueAmount lineage, and serialize.
+ * Build the pendingApprovals Metric from canonical.design_approval — the SAME
+ * shape managementOverview() emits (api.ts:132): a complete, fully-observed count
+ * of internal pending approval records → cited Metric, confidence 'high'. One
+ * Provenance per pending approval (recordRef 'approval:'+id → VALUE = Σ lineage).
+ */
+async function buildPendingApprovals(db, principal) {
+  const res = await db.query(
+    `select id, submitted_date, company_id
+       from canonical.design_approval
+      where company_id = $1 and status = 'pending'
+      order by id`,
+    [principal.companyId],
+  );
+  const rows = res.rows.filter((r) => String(r.company_id) === String(principal.companyId));
+  return {
+    value: rows.length,
+    unit: "count",
+    label: "Pending approvals",
+    confidence: "high", // a direct, complete count of internal records — no estimation
+    completeness: 100,
+    asOf: toIso(AS_OF_PINNED),
+    formula: "count(approvals where status='pending')",
+    sources: rows.map((a) => ({
+      sourceId: "approvals",
+      sourceName: "ArchIntel · Approvals",
+      recordRef: `approval:${a.id}`,
+      observedAt: toIso(a.submitted_date),
+    })),
+  };
+}
+
+/**
+ * Build the collectionRate Metric from canonical.payment_milestone — the SAME
+ * shape managementOverview() emits (api.ts:151): gross low-confidence (⑤ tax
+ * deferred). value === Σreceived ÷ Σbillable × 100 over payments. One Provenance
+ * per contributing payment milestone (drillable lineage, recordRef 'tally:'+ref).
+ */
+async function buildCollectionRate(db, principal) {
+  const res = await db.query(
+    `select id, gross_amount, received_amount, source_record_ref, due_date, company_id
+       from canonical.payment_milestone
+      where company_id = $1
+      order by id`,
+    [principal.companyId],
+  );
+  const rows = res.rows.filter((r) => String(r.company_id) === String(principal.companyId));
+  const received = rows.reduce((s, r) => s + Number(r.received_amount ?? 0), 0);
+  const billable = rows.reduce((s, r) => s + Number(r.gross_amount ?? 0), 0);
+  return {
+    value: billable ? Math.round((received / billable) * 100) : 0,
+    unit: "pct",
+    label: "Collection rate (gross)",
+    confidence: "low", // ⑤ gross — withholding not modeled
+    completeness: 100,
+    asOf: toIso(AS_OF_PINNED),
+    formula: "Σ received ÷ Σ billable (gross)",
+    note: "Gross collection — VAT/VDS/AIT withholding not modeled.",
+    sources: rows.map((pm) => ({
+      sourceId: "tally",
+      sourceName: "TallyPrime",
+      recordRef: pm.source_record_ref,
+      observedAt: toIso(pm.due_date),
+    })),
+  };
+}
+
+/**
+ * Recompute the portfolio summary for the principal at the pinned clock, read
+ * back the summary row + its overdueAmount lineage, derive the pendingApprovals
+ * + collectionRate Metrics from the CANONICAL tables, and serialize the FULL
+ * camelCase managementOverview() shape (band-redacted for non-finance).
  */
 async function buildOverviewPayload(db, principal) {
   // set_config request.* on the warm db, exactly as the harness/tests do.
@@ -98,7 +175,15 @@ async function buildOverviewPayload(db, principal) {
     [summaryRow.kpi_run_id],
   );
 
-  return serializeOverview(summaryRow, linRes.rows, principal);
+  const pendingApprovals = await buildPendingApprovals(db, principal);
+  const collectionRate = await buildCollectionRate(db, principal);
+
+  return serializeOverviewFull(
+    summaryRow,
+    linRes.rows,
+    { pendingApprovals, collectionRate },
+    principal,
+  );
 }
 
 // ── S3 derived-endpoint route table: path → serializer(db, asOf, principal). ──

@@ -41,7 +41,18 @@ const MONEY_KEYS = new Set(
     "collection_rate",
     "collectionRate",
     "receivables",
+    // S3 finance family (financeOverview): overdue + the monthlyFlow-derived
+    // month*/ytd* money figures — all redacted for a non-finance principal so a
+    // designer never sees a money figure on the finance payload.
+    "overdue",
+    "monthIncome",
+    "monthExpense",
+    "monthNet",
+    "ytdIncome",
+    "ytdExpense",
+    "ytdNet",
     "received_amount",
+    "receivedAmount",
     "vat",
     "vds_withheld",
     "ait_withheld",
@@ -157,6 +168,49 @@ function toIso(v) {
   return Number.isNaN(d.getTime()) ? String(v) : d.toISOString();
 }
 
+// Coerce a pg-numeric (arrives as a JS STRING under pglite) → Number.
+function num(v) {
+  return v == null ? 0 : Number(v);
+}
+
+/**
+ * serializeOverviewFull(summaryRow, lineageRows, extras, principal)
+ *   → the FULL camelCase managementOverview() shape (api.ts:94), band-redacted.
+ *
+ * This is the F5/F6 layer-2 contract surface: the LIVE /api/v1/overview must
+ * emit the SAME field contract the frontend managementOverview() producer emits
+ * (activeCount/completedCount/pendingApprovals:Metric/overdueCount/overdueAmount:
+ * Metric/blockedCount/totalContract:number/received:number/billable:number/
+ * collectionRate:Metric) — NOT the raw snake mart row. All DB-internal keys
+ * (kpi_*, *_count, snake aliases) are DROPPED.
+ *
+ * `extras` carries the two Metrics the server computes from the canonical tables:
+ *   - pendingApprovals (count of pending design_approvals, confidence 'high')
+ *   - collectionRate   (Σreceived ÷ Σbillable gross-low, payment sources)
+ *
+ * The plain counts/sums come from the mart summary row (coerced to NUMBERS).
+ * redactRow runs AFTER the camelCase shape is built so a non-finance principal
+ * (designer) gets the money keys (overdueAmount/collectionRate/totalContract/
+ * received/billable) refused/omitted — the finance band, preserved on the NEW shape.
+ */
+export function serializeOverviewFull(summaryRow, lineageRows, extras, principal) {
+  const row = summaryRow ?? {};
+  const overdueAmount = buildOverdueMetric(row, Array.isArray(lineageRows) ? lineageRows : []);
+  const shape = {
+    activeCount: num(row.active_count),
+    completedCount: num(row.completed_count),
+    pendingApprovals: extras?.pendingApprovals,
+    overdueCount: num(row.overdue_count),
+    overdueAmount,
+    blockedCount: num(row.blocked_count),
+    totalContract: num(row.total_contract),
+    received: num(row.received),
+    billable: num(row.billable),
+    collectionRate: extras?.collectionRate,
+  };
+  return redactRow(shape, principal);
+}
+
 /**
  * serializeOverview(row, lineageRows, principal)  — 2b full form
  * serializeOverview(row, principal)               — 2a/spike form (still valid)
@@ -209,4 +263,4 @@ export function serializeMilestones(rows, principal) {
   return Array.isArray(rows) ? rows.map((r) => redactRow(r, principal)) : [];
 }
 
-export default { serializeOverview, serializeClients, serializeProjects, serializeMilestones };
+export default { serializeOverview, serializeOverviewFull, serializeClients, serializeProjects, serializeMilestones };
