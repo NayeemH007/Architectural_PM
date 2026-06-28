@@ -20,6 +20,11 @@ screens/
 backend/.env
 backend/.env.*
 
+# python (FastAPI service) — never commit the venv / bytecode
+**/.venv/
+**/__pycache__/
+*.pyc
+
 # os / editor
 .DS_Store
 Thumbs.db
