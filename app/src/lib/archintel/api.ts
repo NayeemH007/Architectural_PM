@@ -19,6 +19,11 @@ import { expenses, financeOverview, monthlyFlow, profitabilityByProject, expense
 import type { Metric, Provenance } from "@/lib/types";
 // Single clock authority (CONTEXT.md ⑤ / clock as_of). Injected — see lib/clock.ts.
 import { AS_OF } from "@/lib/clock";
+// Real-auth seam: when VITE_USE_SUPABASE_AUTH is ON the backend fetch carries the
+// session JWT (Bearer) to FastAPI instead of the dev X-User-Role/X-Company-Id
+// headers; backendHeaders() picks the right set. Flag OFF → Node-header path,
+// byte-identical.
+import { backendHeaders } from "@/lib/backend-auth";
 
 const LATENCY = 240;
 function resolve<T>(data: T): Promise<T> {
@@ -46,7 +51,7 @@ export async function fetchOverview() {
   if (!USE_BACKEND_AI) return resolve(managementOverview());
   try {
     const res = await fetch(`${BACKEND_AI_URL}/api/v1/overview`, {
-      headers: { "X-Company-Id": FIRM_A, "X-User-Role": "founder" },
+      headers: backendHeaders({ "X-Company-Id": FIRM_A, "X-User-Role": "founder" }),
     });
     if (!res.ok) throw new Error(`backend ${res.status}`);
     return await res.json();
@@ -64,7 +69,7 @@ const FINANCE_HEADERS = { "X-Company-Id": FIRM_A, "X-User-Role": "founder" };
 async function fetchBackend<T>(path: string, fallback: () => T): Promise<T> {
   if (!USE_BACKEND_AI) return resolve(fallback());
   try {
-    const res = await fetch(`${BACKEND_AI_URL}${path}`, { headers: FINANCE_HEADERS });
+    const res = await fetch(`${BACKEND_AI_URL}${path}`, { headers: backendHeaders(FINANCE_HEADERS) });
     if (!res.ok) throw new Error(`backend ${res.status}`);
     return (await res.json()) as T;
   } catch {

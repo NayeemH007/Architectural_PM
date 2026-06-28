@@ -39,7 +39,33 @@ from psycopg.rows import dict_row
 # default published by the supabase CLI). Overridable via env at runtime.
 _LOCAL_DEFAULT_SECRET = "super-secret-jwt-token-with-at-least-32-characters-long"
 JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", _LOCAL_DEFAULT_SECRET)
-JWT_ALGS = ["HS256"]
+
+# Two token families reach this layer and BOTH must verify:
+#   * REAL Supabase-Auth tokens — the current CLI signs access tokens with an
+#     ASYMMETRIC key (ES256/RS256) exposed via the GoTrue JWKS endpoint. These
+#     carry the custom-access-token-hook claims (company_id/app_role/finance_grant).
+#   * MINTED test tokens (mint_jwt.py) — HS256 signed with the shared local secret.
+# We dispatch on the token header `alg`: HS256 -> shared secret; ES256/RS256/...
+# -> the JWKS public key fetched (and cached) from Supabase.
+JWT_HS_ALGS = ["HS256"]
+JWT_ASYM_ALGS = ["ES256", "RS256", "EdDSA", "ES384", "ES512", "RS384", "RS512"]
+
+# GoTrue JWKS endpoint (asymmetric public keys). Derived from the Supabase API URL.
+_SUPABASE_API_URL = os.environ.get("SUPABASE_API_URL", "http://127.0.0.1:54321")
+JWKS_URL = os.environ.get(
+    "SUPABASE_JWKS_URL", f"{_SUPABASE_API_URL}/auth/v1/.well-known/jwks.json"
+)
+
+# Lazily-built, caching JWKS client (PyJWKClient caches keys + refreshes on miss).
+_jwks_client: "jwt.PyJWKClient | None" = None
+
+
+def _jwks() -> "jwt.PyJWKClient":
+    global _jwks_client
+    if _jwks_client is None:
+        _jwks_client = jwt.PyJWKClient(JWKS_URL, cache_keys=True)
+    return _jwks_client
+
 
 DB_DSN = os.environ.get(
     "SUPABASE_DB_DSN", "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
@@ -64,17 +90,38 @@ def verify_jwt(authorization: str | None) -> dict:
     token = authorization[7:].strip()
     if not token:
         raise AuthError("empty bearer token")
+    # Dispatch on the token's signing alg: HS256 -> shared secret (minted tokens);
+    # asymmetric (ES256/RS256/...) -> the GoTrue JWKS public key (real Supabase
+    # tokens). The hook's claims are identical either way.
     try:
-        claims = jwt.decode(
-            token,
-            JWT_SECRET,
-            algorithms=JWT_ALGS,
-            options={"require": ["exp"], "verify_aud": False},
-        )
+        alg = jwt.get_unverified_header(token).get("alg")
+    except jwt.InvalidTokenError as e:
+        raise AuthError("invalid token header") from e
+    try:
+        if alg in JWT_HS_ALGS:
+            claims = jwt.decode(
+                token,
+                JWT_SECRET,
+                algorithms=JWT_HS_ALGS,
+                options={"require": ["exp"], "verify_aud": False},
+            )
+        elif alg in JWT_ASYM_ALGS:
+            signing_key = _jwks().get_signing_key_from_jwt(token)
+            claims = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=JWT_ASYM_ALGS,
+                options={"require": ["exp"], "verify_aud": False},
+            )
+        else:
+            raise AuthError(f"unsupported token alg: {alg}")
     except jwt.ExpiredSignatureError as e:
         raise AuthError("expired token") from e
     except jwt.InvalidTokenError as e:
         raise AuthError("invalid token") from e
+    except jwt.PyJWKClientError as e:
+        # JWKS fetch / key-resolution failure (e.g. unknown kid) -> fail closed.
+        raise AuthError("jwks resolution failed") from e
 
     company_id = claims.get("company_id")
     if not company_id:

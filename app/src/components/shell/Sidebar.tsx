@@ -4,6 +4,8 @@ import { ChevronRight, Plus, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { NAV } from "@/lib/nav";
 import { workspace } from "@/lib/archintel/data";
+import { useAuth } from "@/lib/auth";
+import { AUTH_ENABLED } from "@/lib/supabase";
 import { ArchIntelMark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 
@@ -13,6 +15,8 @@ function matchesPath(to: string, pathname: string) {
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { pathname } = useLocation();
+  // Hardcoded "Fariha Karim · FK" default when the flag is OFF → identical render.
+  const { member } = useAuth();
   const activeGroup = NAV.findIndex((g) => g.items.some((it) => matchesPath(it.to, pathname)));
   const [openGroups, setOpenGroups] = useState<Record<number, boolean>>(() =>
     activeGroup >= 0 ? { [activeGroup]: true } : {},
@@ -97,10 +101,10 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         {/* footer — current user */}
         <div className="border-t border-line p-3">
           <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
-            <div className="grid h-8 w-8 place-items-center rounded-full bg-blue-tint font-mono text-[11px] font-medium text-blue">FK</div>
+            <div className="grid h-8 w-8 place-items-center rounded-full bg-blue-tint font-mono text-[11px] font-medium text-blue">{member.initials}</div>
             <div className="min-w-0 leading-tight">
-              <div className="truncate text-[13px] font-medium text-ink">Fariha Karim</div>
-              <div className="label-draft !text-[9px]">Principal · Co-Founder</div>
+              <div className="truncate text-[13px] font-medium text-ink">{member.name}</div>
+              <div className="label-draft !text-[9px] truncate">{AUTH_ENABLED ? member.title : "Principal · Co-Founder"}</div>
             </div>
           </div>
         </div>

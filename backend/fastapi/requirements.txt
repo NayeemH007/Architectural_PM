@@ -2,3 +2,4 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 psycopg[binary]==3.2.3
 pyjwt==2.10.1
+cryptography>=43.0.0  # PyJWT needs this for ES256/RS256 (real Supabase JWKS tokens)

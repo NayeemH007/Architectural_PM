@@ -10,6 +10,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Confidence, Provenance } from "@/lib/types";
 import { projectsA, members } from "@/lib/archintel/data";
+import { backendHeaders } from "@/lib/backend-auth";
 // Single clock authority — inject, never read the wall clock (see lib/clock.ts).
 import { AS_OF, AS_OF_DATE as TODAY } from "@/lib/clock";
 export { TODAY };
@@ -33,7 +34,7 @@ export async function fetchAiosKpis(): Promise<AiosKpi[]> {
   if (!USE_BACKEND_AIOS) return resolve(aiosKpis());
   try {
     const res = await fetch(`${BACKEND_AI_URL}/api/v1/aios/kpis`, {
-      headers: { "X-Company-Id": FIRM_A, "X-User-Role": "founder" },
+      headers: backendHeaders({ "X-Company-Id": FIRM_A, "X-User-Role": "founder" }),
     });
     if (!res.ok) throw new Error(`backend ${res.status}`);
     return (await res.json()) as AiosKpi[];

@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, Header, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 import auth
@@ -29,6 +30,19 @@ import serializers as S
 from auth import AS_OF_PINNED, KPI_VERSION
 
 app = FastAPI(title="ArchIntel semantic layer (FastAPI/Supabase)")
+
+# ── CORS: the browser SPA calls this API cross-origin from the Vite dev server
+# carrying the Supabase session JWT in the Authorization header. Allow the dev
+# origins + the Authorization header on the read methods (GET/OPTIONS preflight).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_methods=["GET", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 
 # ── Generic 4xx/5xx bodies (A-6: never echo raw PG error / attacker input). ──

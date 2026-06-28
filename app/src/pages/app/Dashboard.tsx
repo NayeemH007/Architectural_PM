@@ -48,6 +48,8 @@ import { cn } from "@/lib/cn";
 import { AiosKpiStrip } from "@/components/archintel/agent";
 import { useDailyBrief, useAiosKpis } from "@/lib/archintel/aios";
 import { BAND_LABEL, BAND_RANK } from "@/lib/archintel/intelligence";
+import { useAuth } from "@/lib/auth";
+import { AUTH_ENABLED } from "@/lib/supabase";
 
 const BRIEF_DOT: Record<string, string> = { rust: "bg-rust", ochre: "bg-ochre", blue: "bg-blue", sage: "bg-sage" };
 
@@ -72,6 +74,10 @@ function currentPhaseStatus(p: ProjectA) {
 }
 
 export default function Dashboard() {
+  // Real signed-in user when the flag is ON; off-path useAuth() returns the
+  // hardcoded "Fariha Karim" default so the greeting stays "…, Fariha".
+  const { member } = useAuth();
+  const firstName = AUTH_ENABLED ? member.name.trim().split(/\s+/)[0] : "Fariha";
   const { data: overview, isLoading: loadingOverview } = useAiOverview();
   const { data: projects, isLoading: loadingProjects } = useAiProjects();
   const { data: approvals, isLoading: loadingApprovals } = useAiApprovals();
@@ -127,7 +133,7 @@ export default function Dashboard() {
     <Page>
       <PageHeader
         kicker={`SPACE ESSE · Project control · ${shortDate(TODAY)}`}
-        title={`${greeting}, Fariha`}
+        title={`${greeting}, ${firstName}`}
         description="Your studio at a glance — what needs a decision today, what ArchIntel has flagged, and where every active project stands."
         actions={
           <Link
