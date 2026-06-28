@@ -1,9 +1,5 @@
-import {
-  format,
-  formatDistanceToNowStrict,
-  differenceInCalendarDays,
-  parseISO,
-} from "date-fns";
+import { format, parseISO } from "date-fns";
+import { daysFrom, relativeTo, AS_OF_DATE } from "@/lib/clock";
 
 /** Format a BDT amount. Large values compact to lakh/crore-friendly K/M. */
 export function bdt(
@@ -62,23 +58,14 @@ export function compactDate(iso: string | null | undefined): string {
   }
 }
 
+/** Human relative time anchored to the locked `as_of` (NOT the wall clock). */
 export function relative(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  try {
-    return `${formatDistanceToNowStrict(parseISO(iso))} ago`;
-  } catch {
-    return "—";
-  }
+  return relativeTo(iso, AS_OF_DATE);
 }
 
-/** Days from today (negative = overdue / in the past). */
+/** Days from the locked `as_of` (negative = overdue / in the past). */
 export function daysFromNow(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  try {
-    return differenceInCalendarDays(parseISO(iso), new Date("2026-06-17"));
-  } catch {
-    return null;
-  }
+  return daysFrom(iso, AS_OF_DATE);
 }
 
 export function initials(name: string): string {

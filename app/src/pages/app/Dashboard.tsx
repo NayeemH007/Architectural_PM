@@ -20,6 +20,7 @@ import { Progress } from "@/components/ui/progress";
 import { Avatar } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { EmptyState } from "@/components/states";
+import { ConfidenceMeter } from "@/components/trust";
 import {
   PhaseBadge,
   HealthBadge,
@@ -46,6 +47,7 @@ import { bdt, shortDate, daysFromNow } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { AiosKpiStrip } from "@/components/archintel/agent";
 import { useDailyBrief, useAiosKpis } from "@/lib/archintel/aios";
+import { BAND_LABEL, BAND_RANK } from "@/lib/archintel/intelligence";
 
 const BRIEF_DOT: Record<string, string> = { rust: "bg-rust", ochre: "bg-ochre", blue: "bg-blue", sage: "bg-sage" };
 
@@ -107,7 +109,8 @@ export default function Dashboard() {
     return [...(risks ?? [])]
       .sort(
         (a, b) =>
-          order[a.severity] - order[b.severity] || b.likelihood - a.likelihood,
+          order[a.severity] - order[b.severity] ||
+          BAND_RANK[b.likelihood.band] - BAND_RANK[a.likelihood.band],
       )
       .slice(0, 3);
   }, [risks]);
@@ -197,7 +200,7 @@ export default function Dashboard() {
             />
             <KpiCard
               kicker="Pending approvals"
-              value={overview.pendingApprovals}
+              metric={overview.pendingApprovals}
               footnote={
                 <Link to="/approvals" className="text-xs text-blue hover:underline">
                   Raiana's queue
@@ -206,19 +209,15 @@ export default function Dashboard() {
             />
             <KpiCard
               kicker="Overdue payments"
-              value={overview.overdueCount}
-              footnote={
-                <span className="text-xs text-rust tnum">
-                  {bdt(overview.overdueAmount, { compact: true })} outstanding
-                </span>
-              }
+              metric={overview.overdueAmount}
             />
             <KpiCard
               kicker="Blocked projects"
               value={overview.blockedCount}
               footnote={
-                <span className="text-xs text-ink-ghost">
-                  {overview.collectionRate}% collected
+                <span className="inline-flex items-center gap-1 text-xs text-ink-ghost" title={overview.collectionRate.note}>
+                  {overview.collectionRate.value}% collected (gross)
+                  <ConfidenceMeter level={overview.collectionRate.confidence} />
                 </span>
               }
             />
@@ -286,8 +285,8 @@ export default function Dashboard() {
                       {r.recommendedAction}
                     </p>
                     <div className="mt-3 flex items-center justify-between border-t border-line pt-2.5">
-                      <span className="text-xs text-ink-ghost tnum">
-                        {r.likelihood}% likely
+                      <span className="text-xs text-ink-ghost">
+                        {BAND_LABEL[r.likelihood.band]}
                       </span>
                       {proj ? (
                         <Link

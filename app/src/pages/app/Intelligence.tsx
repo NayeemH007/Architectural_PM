@@ -44,11 +44,12 @@ import {
   useAiPayments,
 } from "@/lib/archintel/api";
 import { projectById } from "@/lib/archintel/data";
-import { RISK_SUGGESTIONS } from "@/lib/archintel/intelligence";
+import { RISK_SUGGESTIONS, BAND_LABEL, BAND_RANK } from "@/lib/archintel/intelligence";
 import type {
   PredictedRisk,
   RiskSeverity,
   RiskInsight,
+  LikelihoodBand,
 } from "@/lib/archintel/intelligence";
 import { bdt, shortDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -79,13 +80,20 @@ const SEV_TEXT: Record<RiskSeverity, string> = {
   low: "text-blue",
 };
 
-// stage-risk bar colour scale
-function riskColour(index: number) {
-  if (index >= 75) return "bg-rust";
-  if (index >= 55) return "bg-sienna";
-  if (index >= 35) return "bg-ochre";
-  return "bg-sage";
-}
+// stage-risk bar colour + relative width by qualitative band (not a measured score).
+const BAND_COLOUR: Record<LikelihoodBand, string> = {
+  high: "bg-rust",
+  elevated: "bg-sienna",
+  moderate: "bg-ochre",
+  low: "bg-sage",
+};
+// relative bar width per band rank (illustrative, NOT a 0–100 score).
+const BAND_WIDTH: Record<LikelihoodBand, number> = {
+  high: 90,
+  elevated: 65,
+  moderate: 42,
+  low: 18,
+};
 
 // insight icon by kind
 const INSIGHT_ICON: Record<RiskInsight["kind"], typeof Layers> = {
@@ -119,7 +127,12 @@ export default function Intelligence() {
     setRiskState((s) => ({ ...s, [id]: s[id] === next ? "open" : next }));
 
   const sortedRisks = useMemo(() => {
-    return [...(risks ?? [])].sort((a, b) => b.likelihood - a.likelihood);
+    const order = { critical: 0, high: 1, medium: 2, low: 3 } as const;
+    return [...(risks ?? [])].sort(
+      (a, b) =>
+        order[a.severity] - order[b.severity] ||
+        BAND_RANK[b.likelihood.band] - BAND_RANK[a.likelihood.band],
+    );
   }, [risks]);
 
   // ---- KPI derivations ----
@@ -290,18 +303,20 @@ export default function Intelligence() {
                       <span className="text-sm font-medium text-ink">
                         {s.stage}
                       </span>
-                      <span className="font-display text-sm text-ink tnum">
-                        {s.riskIndex}
-                        <span className="text-ink-faint">/100</span>
+                      <span
+                        className="font-display text-sm text-ink"
+                        title={`Qualitative band from the cited signals — not a measured score. ${s.risk.confidence} confidence.`}
+                      >
+                        {BAND_LABEL[s.risk.band]}
                       </span>
                     </div>
                     <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-bone-2">
                       <div
                         className={cn(
                           "h-full rounded-full transition-all duration-700",
-                          riskColour(s.riskIndex),
+                          BAND_COLOUR[s.risk.band],
                         )}
-                        style={{ width: `${s.riskIndex}%` }}
+                        style={{ width: `${BAND_WIDTH[s.risk.band]}%` }}
                       />
                     </div>
                     <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">
@@ -440,13 +455,15 @@ function RiskCard({
           <div className="shrink-0 text-right">
             <div
               className={cn(
-                "font-display text-2xl leading-none tnum",
+                "font-display text-lg leading-tight",
                 SEV_TEXT[risk.severity],
               )}
             >
-              {risk.likelihood}%
+              {BAND_LABEL[risk.likelihood.band]}
             </div>
-            <div className="label-draft mt-0.5 !text-ink-faint">likely</div>
+            <div className="label-draft mt-0.5 !text-ink-faint" title="Qualitative band from the cited signals — not a fabricated %.">
+              {risk.likelihood.confidence} confidence · band
+            </div>
           </div>
         </div>
 

@@ -4,7 +4,7 @@ import * as RD from "@radix-ui/react-dialog";
 import { ArrowUp, Radar, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useAiRisks } from "@/lib/archintel/api";
-import { RISK_ANSWERS, RISK_SUGGESTIONS, genericRiskAnswer, type AIAnswer } from "@/lib/archintel/intelligence";
+import { RISK_ANSWERS, RISK_SUGGESTIONS, genericRiskAnswer, BAND_LABEL, BAND_RANK, type AIAnswer } from "@/lib/archintel/intelligence";
 
 const SEV: Record<string, { dot: string; text: string }> = {
   critical: { dot: "bg-rust", text: "text-rust" },
@@ -34,7 +34,14 @@ export function AssistantPanel({ open, onOpenChange }: { open: boolean; onOpenCh
     }, 600);
   }
 
-  const top = [...risks].sort((a, b) => b.likelihood - a.likelihood).slice(0, 3);
+  const sevOrder = { critical: 0, high: 1, medium: 2, low: 3 } as const;
+  const top = [...risks]
+    .sort(
+      (a, b) =>
+        sevOrder[a.severity] - sevOrder[b.severity] ||
+        BAND_RANK[b.likelihood.band] - BAND_RANK[a.likelihood.band],
+    )
+    .slice(0, 3);
 
   return (
     <RD.Root open={open} onOpenChange={onOpenChange}>
@@ -68,7 +75,7 @@ export function AssistantPanel({ open, onOpenChange }: { open: boolean; onOpenCh
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-sm font-medium text-ink">{r.title}</span>
-                            <span className={cn("shrink-0 text-[11px] font-medium tnum", SEV[r.severity].text)}>{r.likelihood}%</span>
+                            <span className={cn("shrink-0 text-[11px] font-medium", SEV[r.severity].text)}>{BAND_LABEL[r.likelihood.band]}</span>
                           </div>
                           <p className="mt-1 text-xs leading-snug text-ink-soft">{r.recommendedAction}</p>
                           {r.projectId && (

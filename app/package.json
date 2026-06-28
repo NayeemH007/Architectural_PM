@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "contract": "vitest run src/lib/archintel/__tests__/contract-ci-and-prod-port.design.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.2",
@@ -41,6 +44,7 @@
     "playwright": "^1.61.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
-    "vite": "^6.0.3"
+    "vite": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }

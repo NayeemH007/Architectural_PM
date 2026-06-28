@@ -11,6 +11,19 @@
 
 export type RiskSeverity = "critical" | "high" | "medium" | "low";
 
+// Slice 3: the fabricated numeric likelihood (86/64/58/47/72) is replaced by a
+// CITED QUALITATIVE BAND. The band is derived from the risk's real signals
+// (project health, overdue payments, pending approvals) — it carries its own
+// `basis` (the real signals it cites) and an honest `confidence`. AI narrates a
+// band; it never invents a precise %.
+export type LikelihoodBand = "high" | "elevated" | "moderate" | "low";
+
+export interface RiskLikelihood {
+  band: LikelihoodBand;
+  basis: string[]; // the real signals behind the band (non-empty)
+  confidence: "low";
+}
+
 export interface PredictedRisk {
   id: string;
   projectId: string | null;
@@ -19,12 +32,27 @@ export interface PredictedRisk {
   title: string;
   reasoning: string; // why ArchIntel thinks this is a risk
   signals: string[]; // the observed signals behind it
-  likelihood: number; // 0–100 (modelled, not certain)
+  likelihood: RiskLikelihood; // cited qualitative band (not a fabricated %)
   detectedDate: string;
   recommendedAction: string;
   owner: string; // who should act
   status: "open" | "watching" | "mitigated";
 }
+
+// Human-facing label for a band (used by render sites).
+export const BAND_LABEL: Record<LikelihoodBand, string> = {
+  high: "High concern",
+  elevated: "Elevated concern",
+  moderate: "Moderate concern",
+  low: "Low concern",
+};
+// Rank for sorting (higher = more concerning) when severity ties.
+export const BAND_RANK: Record<LikelihoodBand, number> = {
+  high: 3,
+  elevated: 2,
+  moderate: 1,
+  low: 0,
+};
 
 // Proactive flags raised before the issue fully materialises.
 export const predictedRisks: PredictedRisk[] = [
@@ -34,7 +62,8 @@ export const predictedRisks: PredictedRisk[] = [
     reasoning:
       "Two blocking conditions are converging: the layout freeze has waited 3 days in Raiana's approval queue, and the Phase-2 payment is 18 days overdue. Historically, when an approval and a payment block the same gate, the project stops within the week.",
     signals: ["Layout freeze pending review 3 days", "Phase-2 payment ৳9.3L overdue 18 days", "Phase status: blocked"],
-    likelihood: 86, detectedDate: "2026-06-22", recommendedAction: "Escalate the layout freeze to Raiana today and pause new work until the Phase-2 payment is cleared.",
+    likelihood: { band: "high", basis: ["Layout freeze pending review 3 days", "Phase-2 payment ৳9.3L overdue 18 days", "Phase status: blocked"], confidence: "low" },
+    detectedDate: "2026-06-22", recommendedAction: "Escalate the layout freeze to Raiana today and pause new work until the Phase-2 payment is cleared.",
     owner: "Fariha Karim", status: "open",
   },
   {
@@ -43,7 +72,8 @@ export const predictedRisks: PredictedRisk[] = [
     reasoning:
       "The moodboard was sent back for a warmer palette, and the client also requested warmer tones over WhatsApp — two independent signals pointing the same way. Concept projects that pass revision-two without a layout freeze tend to slip 2–3 weeks.",
     signals: ["Approval status: sent to revise", "Client WhatsApp: 'wants warmer tones'", "No layout freeze after 11 weeks"],
-    likelihood: 64, detectedDate: "2026-06-21", recommendedAction: "Consolidate both feedback notes into one revised concept and book a decision call before starting revision three.",
+    likelihood: { band: "elevated", basis: ["Approval status: sent to revise", "Client WhatsApp: 'wants warmer tones'", "No layout freeze after 11 weeks"], confidence: "low" },
+    detectedDate: "2026-06-21", recommendedAction: "Consolidate both feedback notes into one revised concept and book a decision call before starting revision three.",
     owner: "Imran Kabir", status: "open",
   },
   {
@@ -52,7 +82,8 @@ export const predictedRisks: PredictedRisk[] = [
     reasoning:
       "A reception feature wall was added as a change request in Phase 4 with cost impact still 'pending'. Late-stage change requests without a costed amount are the studio's most common source of unbilled scope.",
     signals: ["Change request raised in Phase 4", "Cost impact: pending", "Construction-docs payment only partially received"],
-    likelihood: 58, detectedDate: "2026-06-20", recommendedAction: "Cost the feature wall and issue a change-order before releasing the drawing set for execution.",
+    likelihood: { band: "moderate", basis: ["Change request raised in Phase 4", "Cost impact: pending", "Construction-docs payment only partially received"], confidence: "low" },
+    detectedDate: "2026-06-20", recommendedAction: "Cost the feature wall and issue a change-order before releasing the drawing set for execution.",
     owner: "Fariha Karim", status: "watching",
   },
   {
@@ -61,7 +92,8 @@ export const predictedRisks: PredictedRisk[] = [
     reasoning:
       "The material selection sheet is awaiting Raiana's approval, and the Phase-3 (design development) payment is due in 3 days. The client typically releases payment only after material sign-off — so the approval delay risks a late payment.",
     signals: ["Material approval pending review", "Phase-3 payment due 25 Jun", "Client awaiting material sheet"],
-    likelihood: 47, detectedDate: "2026-06-22", recommendedAction: "Clear the material approval this week so the client can release the Phase-3 payment on time.",
+    likelihood: { band: "moderate", basis: ["Material approval pending review", "Phase-3 payment due 25 Jun", "Client awaiting material sheet"], confidence: "low" },
+    detectedDate: "2026-06-22", recommendedAction: "Clear the material approval this week so the client can release the Phase-3 payment on time.",
     owner: "Raiana Mahmud", status: "open",
   },
   {
@@ -70,22 +102,67 @@ export const predictedRisks: PredictedRisk[] = [
     reasoning:
       "Four design/material approvals are queued, all routed to a single approver (Raiana). When her queue passes three items, projects across the studio begin to wait at their gates. This is the studio's top structural risk.",
     signals: ["4 approvals pending, 1 reviewer", "2 projects blocked at a gate", "Avg time-in-queue rising"],
-    likelihood: 72, detectedDate: "2026-06-22", recommendedAction: "Triage the queue by deadline, and consider delegating low-risk material approvals so concept/technical gates clear faster.",
+    likelihood: { band: "elevated", basis: ["4 approvals pending, 1 reviewer", "2 projects blocked at a gate", "Avg time-in-queue rising"], confidence: "low" },
+    detectedDate: "2026-06-22", recommendedAction: "Triage the queue by deadline, and consider delegating low-risk material approvals so concept/technical gates clear faster.",
     owner: "Fariha Karim", status: "open",
   },
 ];
 
 // Patterns ArchIntel has "learned" about the studio (mock illustrations).
+// Slice 4 (D1): the fabricated numeric `riskIndex` (22/81/64/48) is replaced by a
+// CITED QUALITATIVE BAND over the same enum as risk likelihood. The band is a
+// RELATIVE read, not a measured score — its `basis` cites the real live signals
+// (the predictedRisks flagged at that gate + the at-risk projects/approvals there).
 export interface StagePattern {
   stage: string;
-  riskIndex: number; // 0–100 relative riskiness
+  risk: RiskLikelihood; // cited band {band, basis[] (non-empty), confidence:'low'}
   note: string;
 }
 export const stageRisk: StagePattern[] = [
-  { stage: "Discovery", riskIndex: 22, note: "Low risk — mostly internal, client requirement gate is rarely contested." },
-  { stage: "Concept", riskIndex: 81, note: "Riskiest stage. Revision loops + the layout-freeze gate are where most projects stall." },
-  { stage: "Design Dev", riskIndex: 64, note: "Material-lock gate and Raiana's approval are the common blockers." },
-  { stage: "Construction Docs", riskIndex: 48, note: "Late change requests and final-payment timing drive risk here." },
+  {
+    stage: "Discovery",
+    risk: { band: "low", basis: ["No risks currently flagged at Discovery", "Client-requirement gate rarely contested"], confidence: "low" },
+    note: "Low risk — mostly internal, client requirement gate is rarely contested.",
+  },
+  {
+    stage: "Concept",
+    risk: {
+      band: "high",
+      basis: [
+        "r1 — Tejgaon Office about to stall (layout-freeze gate)",
+        "r2 — Banani Café heading into a third concept revision",
+        "ap1 — layout-freeze approval pending (a5)",
+        "Concept-stage payment ৳9.3L overdue (a5)",
+      ],
+      confidence: "low",
+    },
+    note: "Riskiest stage. Revision loops + the layout-freeze gate are where most projects stall.",
+  },
+  {
+    stage: "Design Dev",
+    risk: {
+      band: "elevated",
+      basis: [
+        "r4 — Gulshan material approval blocking the Phase-3 payment",
+        "ap2 — material approval pending (a1)",
+        "ap5 — 3D visuals approval pending (a6)",
+      ],
+      confidence: "low",
+    },
+    note: "Material-lock gate and Raiana's approval are the common blockers.",
+  },
+  {
+    stage: "Construction Docs",
+    risk: {
+      band: "moderate",
+      basis: [
+        "r3 — MediCare change request may erode margin (un-costed)",
+        "Construction-docs milestone only partially received (a3)",
+      ],
+      confidence: "low",
+    },
+    note: "Late change requests and final-payment timing drive risk here.",
+  },
 ];
 
 export interface RiskInsight {
@@ -118,7 +195,7 @@ export const RISK_SUGGESTIONS = [
 export const RISK_ANSWERS: Record<string, AIAnswer> = {
   "What's most likely to go wrong this week?": {
     q: "What's most likely to go wrong this week?",
-    body: "Tejgaon Office (Bashati) is the one to watch — 86% likely to stall. Its layout freeze has been waiting on Raiana for 3 days and its Phase-2 payment is 18 days overdue; those two together have stopped projects within a week before. Clear the approval today and chase the payment.",
+    body: "Tejgaon Office (Bashati) is the one to watch — high concern, the most likely to stall this week. Its layout freeze has been waiting on Raiana for three days and its Phase-2 payment is well overdue; those two together have stopped projects within a week before. Clear the approval today and chase the payment.",
     refs: ["Tejgaon Office · blocked gate", "Risk Radar r1"],
   },
   "Which project should I worry about?": {
@@ -129,7 +206,7 @@ export const RISK_ANSWERS: Record<string, AIAnswer> = {
   "Why do our projects keep stalling at Concept?": {
     q: "Why do our projects keep stalling at Concept?",
     body: "Two reasons show up repeatedly: revision loops that run past round two without a decision, and the layout-freeze gate waiting on a single approver. Hospitality and retail projects are the worst for revisions. A firm 'revision-two then decide' rule plus faster freeze approvals would remove most of it.",
-    refs: ["Stage risk · Concept 81/100", "Insight i1", "Insight i4"],
+    refs: ["Stage risk · Concept (highest concern)", "Insight i1", "Insight i4"],
   },
   "Where is money at risk right now?": {
     q: "Where is money at risk right now?",
